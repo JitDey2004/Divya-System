@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Grid Fault Detection - Interactive Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="ti ti-zap"></i> Power Grid Control</h3>
+            </div>
+            <nav>
+                <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+                    <i class="ti ti-layout-dashboard"></i> <span>Dashboard</span>
+                </div>
+                <div class="nav-item" data-page="map" onclick="switchPage('map')">
+                    <i class="ti ti-map"></i> <span>Live Map</span>
+                </div>
+                <div class="nav-item" data-page="engineers" onclick="switchPage('engineers')">
+                    <i class="ti ti-users"></i> <span>Engineers</span>
+                </div>
+                <div class="nav-item" data-page="analytics" onclick="switchPage('analytics')">
+                    <i class="ti ti-chart-line"></i> <span>Analytics</span>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span id="systemStatus">System: Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="page-content active">
+                <div class="page-header">
+                    <h1>System Dashboard</h1>
+                    <p>Real-time power grid monitoring and fault detection</p>
+                </div>
+
+                <section id="alertBanner" class="alert-banner hidden">
+                    <div class="alert-text">
+                        <i class="ti ti-alert-triangle"></i>
+                        <span id="alertMsg">Fault Detected!</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <input id="simIp" placeholder="192.168.1.12" style="padding:6px;border-radius:6px;border:1px solid var(--border)" />
+                        <button onclick="simulateFaultFromUI()" class="btn-primary">Simulate Fault</button>
+                        <button onclick="resetSystem()" class="btn-success">Resolve</button>
+                    </div>
+                </section>
+
+                <section class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-icon"><i class="ti ti-alert-circle"></i></div>
+                        <span>Active Faults</span>
+                        <h2 id="faultCount">0</h2>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon"><i class="ti ti-clock"></i></div>
+                        <span>Avg Response Time</span>
+                        <h2>4.2m</h2>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon"><i class="ti ti-heartbeat"></i></div>
+                        <span>System Status</span>
+                        <h2 class="text-green">Online</h2>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon"><i class="ti ti-network"></i></div>
+                        <span>Modules Online</span>
+                        <h2 id="modulesOnline">0</h2>
+                    </div>
+                </section>
+
+                <div class="content-grid">
+                    <section class="card">
+                        <h3><i class="ti ti-map-pin"></i> Quick Map View</h3>
+                        <div id="dashboard-map" style="height: 300px; border-radius: 8px;"></div>
+                    </section>
+                    <section class="card">
+                        <h3><i class="ti ti-list"></i> Recent Events</h3>
+                        <div id="recentEvents" class="events-list">
+                            <p class="text-muted">No recent events</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Live Map Page -->
+            <div id="map-page" class="page-content">
+                <div class="page-header">
+                    <h1>Live Network Map</h1>
+                    <p>Interactive map with real-time fault detection</p>
+                </div>
+                <section class="map-card full-map">
+                    <div id="map" class="main-map"></div>
+                    
+                    <!-- Real-time Status Overlay -->
+                    <div id="mapStatusOverlay" class="map-status-overlay">
+                        <div style="font-weight: 600; margin-bottom: 12px; color: var(--primary);">
+                            <i class="ti ti-dashboard"></i> Live Status
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-label">
+                                <i class="ti ti-server"></i> Modules Online
+                            </div>
+                            <div class="status-item-value" id="statusModules">5</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-label">
+                                <i class="ti ti-alert-circle"></i> Active Faults
+                            </div>
+                            <div class="status-item-value danger" id="statusFaults">0</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-label">
+                                <i class="ti ti-users"></i> Engineers Active
+                            </div>
+                            <div class="status-item-value" id="statusEngineers">4</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-item-label">
+                                <i class="ti ti-pulse"></i> System Status
+                            </div>
+                            <div class="status-item-value success" id="statusSystem">Online</div>
+                        </div>
+                    </div>
+                    
+                    <div class="map-controls">
+                        <button id="centerMapBtn" class="btn-secondary" onclick="centerMap()">
+                            <i class="ti ti-target"></i> Center Map
+                        </button>
+                        <button id="toggleLayerBtn" class="btn-secondary" onclick="toggleMapLayer()">
+                            <i class="ti ti-layers"></i> Toggle Layer
+                        </button>
+                        <button id="zoomInBtn" class="btn-secondary" onclick="zoomMap(1)">
+                            <i class="ti ti-zoom-in"></i> Zoom In
+                        </button>
+                        <button id="zoomOutBtn" class="btn-secondary" onclick="zoomMap(-1)">
+                            <i class="ti ti-zoom-out"></i> Zoom Out
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Engineers Page -->
+            <div id="engineers-page" class="page-content">
+                <div class="page-header">
+                    <h1>Field Engineers</h1>
+                    <p>Manage and track field engineers</p>
+                </div>
+                <section class="card">
+                    <div class="search-bar">
+                        <i class="ti ti-search"></i>
+                        <input type="text" id="engineerSearch" placeholder="Search engineers..." onkeyup="filterEngineers()">
+                    </div>
+                    <div id="engineersList" class="engineers-grid">
+                        <p class="text-muted">Loading engineers...</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Analytics Page -->
+            <div id="analytics-page" class="page-content">
+                <div class="page-header">
+                    <h1>System Analytics</h1>
+                    <p>Performance metrics and historical data</p>
+                </div>
+                <div class="analytics-grid">
+                    <section class="card">
+                        <h3><i class="ti ti-chart-bar"></i> Faults by Module</h3>
+                        <div id="faultsByModule" class="chart-placeholder">
+                            <canvas id="faultsChart"></canvas>
+                        </div>
+                    </section>
+                    <section class="card">
+                        <h3><i class="ti ti-trend-up"></i> System Uptime</h3>
+                        <div class="uptime-stat">
+                            <h2>99.8%</h2>
+                            <p>Last 30 days</p>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Leaflet Maps (Free, No API Key Required) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

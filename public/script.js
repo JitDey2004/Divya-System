@@ -6,8 +6,37 @@ let markers = {};
 let dashboardMarkers = {};
 let modules = {};
 let engineers = [];
+let networkModules = [];
+let networkLayer;
+// Function to generate mock network modules if none are present
+function generateMockNetworkModules(count = 200) {
+  const centerLat = 22.5726;
+  const centerLng = 88.3639;
+  const spacing = 0.0004; // ~44m
+  const modules = [];
+  for (let i = 0; i < count; i++) {
+    const row = Math.floor(i / 20);
+    const col = i % 20;
+    const lat = centerLat + (row - 5) * spacing;
+    const lng = centerLng + (col - 10) * spacing;
+    modules.push({
+      id: i + 1,
+      name: `Parent Module ${i + 1}`,
+      lat,
+      lng,
+      type: 'parent',
+      children: [
+        { id: `c${i}a`, name: `Child A`, lat: lat + 0.0001, lng: lng + 0.0001 },
+        { id: `c${i}b`, name: `Child B`, lat: lat + 0.0001, lng: lng - 0.0001 }
+      ]
+    });
+  }
+  return modules;
+}
 let faultLog = [];
 let currentPage = 'dashboard';
+// New global layer groups
+let faultLayer;   // Layer for fault module markers
 
 // Leaflet-based implementation (no API key needed)
 let L_initialized = false;
@@ -25,6 +54,18 @@ async function init() {
         ]);
         modules = await modRes.json();
         engineers = await engRes.json();
+        // Load network modules (mock if not available)
+        try {
+            const netRes = await fetch('/data/networkModules.json');
+            if (netRes.ok) {
+                networkModules = await netRes.json();
+            } else {
+                networkModules = generateMockNetworkModules();
+            }
+        } catch (e) {
+            console.warn('Network modules not found, generating mock data');
+            networkModules = generateMockNetworkModules();
+        }
 
         // Update modules count
         document.getElementById('modulesOnline').textContent = Object.keys(modules).length;
@@ -129,7 +170,7 @@ function initMaps() {
             const m = modules[ip];
             
             try {
-                // Create custom marker
+                // Create custom marker for regular module
                 const markerIcon = L.icon({
                     iconUrl: createMarkerIconUrl('green'),
                     iconSize: [32, 40],
@@ -170,6 +211,61 @@ function initMaps() {
         }
 
         L_initialized = true;
+        // Initialize network layer with hexagonal polygons
+        networkLayer = L.layerGroup();
+        if (networkModules && networkModules.length) {
+            networkModules.forEach(mod => {
+                const childCount = mod.children ? mod.children.length : 0;
+                const baseRadius = 0.00005; // base radius
+                const radius = baseRadius + 0.000004 * childCount; // adjust size based on children
+                const points = [];
+                for (let i = 0; i < 6; i++) {
+                    const angle = Math.PI / 3 * i;
+                    const lat = mod.lat + radius * Math.cos(angle);
+                    const lng = mod.lng + radius * Math.sin(angle);
+                    points.push([lat, lng]);
+                }
+                const hex = L.polygon(points, {
+                    color: '#1971c2',
+                    weight: 1,
+                    fillColor: '#1971c2',
+                    fillOpacity: 0.2,
+                    className: 'network-hex'
+                }).on('click', () => alert(`Network Module: ${mod.name}`));
+
+                // Parent marker with distinct colour
+                const parentIcon = L.icon({
+                    iconUrl: createMarkerIconUrl('blue'),
+                    iconSize: [28, 36],
+                    iconAnchor: [14, 36],
+                    popupAnchor: [0, -36]
+                });
+                const parentMarker = L.marker([mod.lat, mod.lng], { icon: parentIcon }).bindPopup(`
+                    <div class="module-popup">
+                        <div class="module-popup-header">${mod.name}</div>
+                        <div class="module-popup-info">
+                            <div class="module-popup-info-row"><span class="module-popup-info-label">ID:</span><span class="module-popup-info-value">${mod.id}</span></div>
+                            <div class="module-popup-info-row"><span class="module-popup-info-label">Type:</span><span class="module-popup-info-value">${mod.type}</span></div>
+                        </div>
+                    </div>`);
+                networkLayer.addLayer(hex);
+                networkLayer.addLayer(parentMarker);
+
+                // Render children
+                if (mod.children) {
+                    mod.children.forEach(child => {
+                        const childMarker = L.circleMarker([child.lat, child.lng], {
+                            radius: 4,
+                            color: '#e67700',
+                            fillColor: '#ffa94d',
+                            fillOpacity: 1
+                        }).bindPopup(`Child: ${child.name}`);
+                        networkLayer.addLayer(childMarker);
+                    });
+                }
+            });
+        }
+        // Do not add to map initially; toggleMapLayer handles it
         console.log('✅ Leaflet maps initialized successfully');
     } catch (err) {
         console.error('❌ Leaflet map init error:', err);
@@ -182,9 +278,41 @@ function createMarkerIconUrl(color) {
     const colors = {
         green: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
         red: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-        yellow: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png'
+        yellow: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+        blue: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
     };
     return colors[color] || colors.green;
+}
+
+// Update Fault Dashboard
+function updateFaultDashboard(module) {
+    // Populate fault details section
+    const timestampEl = document.getElementById('faultTimestamp');
+    const areaEl = document.getElementById('faultArea');
+    const networkIdEl = document.getElementById('faultNetworkId');
+    const parentModuleEl = document.getElementById('faultParentModule');
+    const locationEl = document.getElementById('faultLocation');
+    const countDetailEl = document.getElementById('faultCountDetail');
+    const detailsSection = document.getElementById('faultDetails');
+
+    if (timestampEl) timestampEl.textContent = new Date().toLocaleString();
+    if (areaEl) areaEl.textContent = 'Kolkata Metropolitan Area';
+    if (networkIdEl) networkIdEl.textContent = module.id || '';
+    if (parentModuleEl) parentModuleEl.textContent = module.name || '';
+    if (locationEl) locationEl.textContent = `${module.lat.toFixed(5)}, ${module.lng.toFixed(5)}`;
+    if (countDetailEl) {
+        const current = parseInt(countDetailEl.textContent) || 0;
+        countDetailEl.textContent = current + 1;
+    }
+    // Ensure details section is visible
+    if (detailsSection) detailsSection.classList.remove('hidden');
+
+    // Also log in the recent events table (if exists)
+    const table = document.getElementById('faultLogTable');
+    if (table) {
+        const row = table.insertRow(0);
+        row.innerHTML = `<td>${module.name}</td><td>${new Date().toLocaleTimeString()}</td><td><span class="badge badge-danger">Active</span></td>`;
+    }
 }
 
 // Create custom marker icon with status
@@ -266,6 +394,8 @@ function handleFault(ip) {
         <i class="ti ti-alert-triangle"></i>
         <strong>Fault Detected!</strong> ${module.name} (${ip})
     `;
+    // Update fault details in dashboard
+    updateFaultDashboard(module);
 
     // Find closest engineer using Haversine formula
     let closest = engineers[0];
@@ -450,22 +580,46 @@ function switchPage(pageName) {
 
 // Center map
 function centerMap() {
+    // Kolkata metropolitan centre
+    const kolkataCenter = [22.5726, 88.3639];
     if (map) {
-        map.setView([19.08, 72.88], 13);
+        map.setView(kolkataCenter, 13);
     }
     if (dashboardMap) {
-        dashboardMap.setView([19.08, 72.88], 12);
+        dashboardMap.setView(kolkataCenter, 12);
     }
 }
 
 // Toggle map layer
 function toggleMapLayer() {
-    if (map) {
-        const currentType = map.getMapTypeId ? map.getMapTypeId() : 'roadmap';
-        // Leaflet uses tile layers, so we toggle between different tile providers
-        console.log('Map layer toggle (no-op for Leaflet - using OpenStreetMap)');
+    if (!map) return;
+    const btn = document.getElementById('togglelayerBtn');
+    if (!networkLayer) return;
+    if (map.hasLayer(networkLayer)) {
+        map.removeLayer(networkLayer);
+        if (btn) btn.innerHTML = '<i class="ti ti-layers"></i> Show Network Layer';
+    } else {
+        map.addLayer(networkLayer);
+        if (btn) btn.innerHTML = '<i class="ti ti-layers"></i> Hide Network Layer';
     }
 }
+
+// Toggle Network Layer (separate button) – mirrors toggleMapLayer functionality
+function toggleNetworkLayer() {
+    // Reuse toggleMapLayer to avoid duplicate logic
+    toggleMapLayer();
+    const btn = document.getElementById('toggleNetworkBtn');
+    if (btn) {
+        // Update button text based on current layer state
+        if (map && map.hasLayer(networkLayer)) {
+            btn.innerHTML = '<i class="ti ti-network"></i> Hide Network Layer';
+        } else {
+            btn.innerHTML = '<i class="ti ti-network"></i> Show Network Layer';
+        }
+    }
+}
+
+
 
 // Zoom map in or out
 function zoomMap(direction) {
@@ -478,6 +632,27 @@ function zoomMap(direction) {
 // Update map status overlay
 function updateMapStatus() {
     const faultCount = Object.values(dispatchedEngineers).length;
+    const activeEngineers = Object.keys(dispatchedEngineers).length;
+    
+    const statusModulesEl = document.getElementById('statusModules');
+    const statusFaultsEl = document.getElementById('statusFaults');
+    const statusEngineersEl = document.getElementById('statusEngineers');
+    const statusSystemEl = document.getElementById('statusSystem');
+    
+    if (statusModulesEl) statusModulesEl.textContent = Object.keys(modules).length;
+    if (statusFaultsEl) {
+        statusFaultsEl.textContent = faultCount;
+        statusFaultsEl.className = faultCount > 0 ? 'status-item-value danger' : 'status-item-value success';
+    }
+    if (statusEngineersEl) statusEngineersEl.textContent = engineers.length;
+    if (statusSystemEl) {
+        statusSystemEl.textContent = socket.connected ? 'Online' : 'Offline';
+        statusSystemEl.className = socket.connected ? 'status-item-value success' : 'status-item-value danger';
+    }
+    // Ensure overlay stays on top
+    const overlay = document.getElementById('mapStatusOverlay');
+    if (overlay) overlay.style.zIndex = '2000';
+}
     const activeEngineers = Object.keys(dispatchedEngineers).length;
     
     const statusModulesEl = document.getElementById('statusModules');

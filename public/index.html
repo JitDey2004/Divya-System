@@ -91,6 +91,15 @@
                         </div>
                     </section>
                 </div>
+                <section id="faultDetails" class="dashboard-section hidden">
+                    <h2>Fault Details</h2>
+                    <p><strong>Timestamp:</strong> <span id="faultTimestamp"></span></p>
+                    <p><strong>Area:</strong> <span id="faultArea"></span></p>
+                    <p><strong>Network ID:</strong> <span id="faultNetworkId"></span></p>
+                    <p><strong>Parent Module:</strong> <span id="faultParentModule"></span></p>
+                    <p><strong>Location:</strong> <span id="faultLocation"></span></p>
+                    <p><strong>Fault Count:</strong> <span id="faultCountDetail"></span></p>
+                </section>
             </div>
 
             <!-- Live Map Page -->
@@ -139,6 +148,9 @@
                         </button>
                         <button id="toggleLayerBtn" class="btn-secondary" onclick="toggleMapLayer()">
                             <i class="ti ti-layers"></i> Toggle Layer
+                        </button>
+                        <button id="toggleNetworkBtn" class="btn-secondary" onclick="toggleNetworkLayer()">
+                            <i class="ti ti-network"></i> Network Layer
                         </button>
                         <button id="zoomInBtn" class="btn-secondary" onclick="zoomMap(1)">
                             <i class="ti ti-zoom-in"></i> Zoom In

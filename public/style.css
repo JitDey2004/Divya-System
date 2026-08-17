@@ -235,14 +235,25 @@ nav {
     overflow: hidden;
 }
 #map, #dashboard-map { 
-    height: 100%;
+    height: 420px;
     width: 100%; 
+    min-height: 420px;
     border-radius: var(--radius);
     position: relative;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    display: block;
+}
+
+.main-map {
+    flex: 1;
+    min-height: 520px;
+    border-radius: 0;
+}
+
+.full-map {
+    height: 620px;
+    min-height: 620px;
+    overflow: hidden;
 }
 
 .map-unavailable {

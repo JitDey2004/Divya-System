@@ -436,14 +436,16 @@ function switchPage(pageName) {
     
     // Trigger map resize if needed
     setTimeout(() => {
-        if (pageName === 'map' && map) {
-            // Leaflet maps handle resize automatically via invalidateSize()
-            if (map.invalidateSize) {
-                map.invalidateSize();
-            }
-            updateMapStatus(); // Update status when map page is displayed
+        if (map && map.invalidateSize) {
+            map.invalidateSize();
         }
-    }, 100);
+        if (dashboardMap && dashboardMap.invalidateSize) {
+            dashboardMap.invalidateSize();
+        }
+        if (pageName === 'map') {
+            updateMapStatus();
+        }
+    }, 150);
 }
 
 // Center map

@@ -1,6 +1,0 @@
-[
-  { "id": 1, "name": "Rahul Sharma", "lat": 22.5726, "lng": 88.3639, "phone": "+91 9876543210", "email": "rahul.sharma@powergrid.com", "specialization": "Network" },
-  { "id": 2, "name": "Amit Verma", "lat": 22.5825, "lng": 88.3910, "phone": "+91 9876543211", "email": "amit.verma@powergrid.com", "specialization": "Maintenance" },
-  { "id": 3, "name": "Priya Patel", "lat": 22.5638, "lng": 88.3494, "phone": "+91 9876543212", "email": "priya.patel@powergrid.com", "specialization": "Testing" },
-  { "id": 4, "name": "Vikram Singh", "lat": 22.5950, "lng": 88.4050, "phone": "+91 9876543213", "email": "vikram.singh@powergrid.com", "specialization": "Installation" }
-]

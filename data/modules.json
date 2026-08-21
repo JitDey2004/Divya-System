@@ -1,7 +1,0 @@
-{
-  "192.168.1.10": { "name": "Parent Mod A", "lat": 22.5726, "lng": 88.3639, "type": "parent" },
-  "192.168.1.11": { "name": "Child Mod 1", "lat": 22.5780, "lng": 88.3675, "type": "child" },
-  "192.168.1.12": { "name": "Child Mod 2", "lat": 22.5844, "lng": 88.3720, "type": "child" },
-  "192.168.1.20": { "name": "Parent Mod B", "lat": 22.5920, "lng": 88.3800, "type": "parent" },
-  "192.168.1.21": { "name": "Child Mod 3", "lat": 22.5988, "lng": 88.3885, "type": "child" }
-}

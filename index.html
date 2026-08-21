@@ -1,0 +1,2320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DIVYA SYSTEM — Grid Monitoring Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --bg:#070b10;
+    --panel:#0e141b;
+    --panel-2:#121a22;
+    --border:#1e2b37;
+    --border-soft:#161f28;
+    --text:#e7edf3;
+    --text-dim:#8ea0b0;
+    --text-faint:#4d5f6f;
+    --cyan:#4fd1c5;
+    --cyan-dim:rgba(79,209,197,0.35);
+    --violet:#a78bfa;
+    --violet-dim:rgba(167,139,250,0.35);
+    --active:#34d399;
+    --fault:#fb6767;
+    --maint:#fdb756;
+    --service:#5ab8ff;
+    --mono:'JetBrains Mono',monospace;
+    --disp:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--body);height:100%;}
+  body{
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(79,209,197,0.06), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(90,184,255,0.05), transparent 55%);
+    min-height:100vh;
+  }
+  ::selection{background:var(--cyan-dim);}
+  a{color:inherit;}
+  button{font-family:inherit;}
+ 
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 22px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg, rgba(18,26,34,0.9), rgba(14,20,27,0.7));
+    position:sticky;top:0;z-index:60;backdrop-filter:blur(6px);
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .hamburger{
+    width:34px;height:34px;border-radius:7px;border:1px solid var(--border);
+    background:var(--panel-2);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;flex-direction:column;gap:3px;transition:border-color .15s;
+  }
+  .hamburger:hover{border-color:var(--cyan-dim);}
+  .hamburger span{width:15px;height:1.5px;background:var(--text-dim);display:block;}
+  .brand .mark{
+    width:34px;height:34px;border:1px solid var(--cyan-dim);border-radius:7px;
+    display:flex;align-items:center;justify-content:center;color:var(--cyan);
+    font-family:var(--mono);font-size:13px;font-weight:600;
+    background:rgba(79,209,197,0.06);
+  }
+  .brand h1{
+    font-family:var(--disp);font-size:17px;font-weight:700;letter-spacing:0.06em;
+    margin:0;color:var(--text);
+  }
+  .brand .sub{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);letter-spacing:0.08em;margin-top:1px;}
+  .topbar-right{display:flex;align-items:center;gap:18px;}
+  .clock{font-family:var(--mono);font-size:12.5px;color:var(--text-dim);letter-spacing:0.03em;}
+  .live-pill{
+    display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;
+    color:var(--active);border:1px solid rgba(52,211,153,0.3);background:rgba(52,211,153,0.07);
+    padding:5px 10px;border-radius:20px;letter-spacing:0.06em;
+  }
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--active);box-shadow:0 0 8px var(--active);animation:pulse 1.8s infinite ease-in-out;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.25;}}
+ 
+  /* ---------- sidebar ---------- */
+  .sidebar-backdrop{
+    position:fixed;inset:0;background:rgba(3,6,9,0.55);z-index:70;
+    opacity:0;pointer-events:none;transition:opacity .18s;
+  }
+  .sidebar-backdrop.open{opacity:1;pointer-events:auto;}
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;width:270px;z-index:80;
+    background:var(--panel);border-right:1px solid var(--border);
+    transform:translateX(-100%);transition:transform .2s ease;
+    display:flex;flex-direction:column;
+  }
+  .sidebar.open{transform:translateX(0);}
+  .sidebar-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border-soft);}
+  .sidebar-nav{display:flex;flex-direction:column;padding:10px;gap:4px;}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;text-align:left;
+    padding:11px 13px;border-radius:9px;border:1px solid transparent;
+    background:transparent;color:var(--text-dim);font-family:var(--body);font-size:13.5px;font-weight:500;
+    cursor:pointer;transition:all .12s;
+  }
+  .nav-item .ic{font-size:15px;width:18px;text-align:center;}
+  .nav-item:hover{background:var(--panel-2);color:var(--text);}
+  .nav-item.active{background:rgba(79,209,197,0.08);border-color:var(--cyan-dim);color:var(--text);}
+  .sidebar-foot{margin-top:auto;padding:14px 18px;font-family:var(--mono);font-size:9.5px;color:var(--text-faint);border-top:1px solid var(--border-soft);}
+ 
+  /* ---------- selector row ---------- */
+  .selectors{
+    display:flex;gap:10px;padding:14px 22px;border-bottom:1px solid var(--border);
+    flex-wrap:wrap;background:rgba(255,255,255,0.012);
+  }
+  .field{display:flex;flex-direction:column;gap:5px;min-width:200px;flex:1 1 220px;}
+  .field label{
+    font-family:var(--mono);font-size:9.5px;color:var(--text-faint);
+    letter-spacing:0.12em;text-transform:uppercase;
+  }
+  select{
+    appearance:none;-webkit-appearance:none;
+    background:var(--panel-2);color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:9px 34px 9px 12px;font-family:var(--mono);font-size:12.5px;
+    cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0L5 6L10 0' stroke='%238ea0b0' fill='none' stroke-width='1.3'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;
+    transition:border-color .15s;
+  }
+  select:hover, select:focus{border-color:var(--cyan-dim);outline:none;}
+ 
+  /* ---------- main layout ---------- */
+  .layout{
+    display:grid;grid-template-columns:290px 1fr 300px;gap:14px;
+    padding:16px 22px;align-items:start;
+  }
+  @media (max-width: 980px){
+    .layout{grid-template-columns:1fr;}
+  }
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;
+  }
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 15px;border-bottom:1px solid var(--border-soft);
+    background:rgba(255,255,255,0.015);
+  }
+  .panel-head h2{
+    font-family:var(--disp);font-size:12px;font-weight:600;letter-spacing:0.1em;
+    text-transform:uppercase;color:var(--cyan);margin:0;
+  }
+  .panel-head h2.violet{color:var(--violet);}
+  .panel-head .code-tag{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);}
+  .panel-body{padding:14px 15px;}
+ 
+  /* ---------- section details ---------- */
+  .incharge-row{display:flex;flex-direction:column;gap:3px;margin-bottom:14px;}
+  .incharge-name{font-family:var(--disp);font-weight:600;font-size:15px;}
+  .incharge-meta{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);}
+  .loc-breadcrumb{
+    font-family:var(--mono);font-size:10.5px;color:var(--text-faint);
+    margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed var(--border-soft);
+    line-height:1.7;
+  }
+  .loc-breadcrumb b{color:var(--text-dim);font-weight:500;}
+ 
+  .net-group{margin-top:14px;}
+  .net-group-title{
+    display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;
+    letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);margin-bottom:8px;
+  }
+  .net-group-title .dot{width:7px;height:7px;border-radius:2px;}
+  .mod-list{display:flex;flex-direction:column;gap:5px;}
+  .mod-item{
+    display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;
+    background:var(--panel-2);border:1px solid var(--border-soft);
+    font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .12s;
+  }
+  .mod-item:hover{border-color:var(--cyan-dim);transform:translateX(2px);}
+  .mod-item.selected{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset;}
+  .mod-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .mod-code{flex:1;color:var(--text);}
+  .mod-status{font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-faint);}
+  .empty-note{font-family:var(--mono);font-size:11px;color:var(--text-faint);padding:6px 2px;}
+ 
+  /* ---------- map / mesh panel ---------- */
+  .mesh-panel{position:relative;}
+  #map{height:480px;width:100%;background:#aad3df;}
+  .leaflet-container{font-family:var(--body);background:#0a1016 !important;}
+  .leaflet-control-attribution{background:rgba(10,14,18,0.7) !important;color:var(--text-faint) !important;font-size:9px !important;}
+  .leaflet-control-attribution a{color:var(--text-dim) !important;}
+  .leaflet-control-zoom a{
+    background:var(--panel-2) !important;color:var(--text) !important;border-color:var(--border) !important;
+  }
+ 
+  .mesh-toolbar{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    padding:10px 14px;border-top:1px solid var(--border-soft);
+    background:rgba(255,255,255,0.015);
+  }
+  .toggle-btn{
+    display:flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:0.03em;color:var(--text-dim);
+    background:var(--panel-2);border:1px solid var(--border);border-radius:20px;
+    padding:6px 11px;cursor:pointer;transition:all .12s;user-select:none;
+  }
+  .toggle-btn .sw{width:8px;height:8px;border-radius:50%;background:var(--text-faint);transition:all .15s;}
+  .toggle-btn.on{color:var(--text);border-color:var(--cyan-dim);}
+  .toggle-btn.on .sw{background:var(--cyan);box-shadow:0 0 6px var(--cyan);}
+  .toggle-btn.stream-btn.on{color:var(--active);border-color:rgba(52,211,153,0.35);}
+  .toggle-btn.stream-btn.on .sw{background:var(--active);box-shadow:0 0 6px var(--active);}
+  .toggle-btn:hover{border-color:var(--cyan-dim);}
+  .toolbar-spacer{flex:1;}
+  .legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;color:var(--text-faint);}
+  .legend-dot{width:7px;height:7px;border-radius:50%;}
+ 
+  /* leaflet custom marker */
+  .node-icon{
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:9px;font-weight:600;color:#04120c;
+    width:24px;height:24px;border-radius:50%;
+    border:1.5px solid rgba(255,255,255,0.55);
+    box-shadow:0 0 0 3px rgba(0,0,0,0.2);
+  }
+  .node-icon.active{background:var(--active);}
+  .node-icon.fault{background:var(--fault);color:#2a0505;}
+  .node-icon.maintenance{background:var(--maint);color:#2a1a02;}
+  .node-icon.service{background:var(--service);color:#02182a;}
+  .node-icon.selected{outline:2px solid #fff;outline-offset:2px;}
+  .stream-on .node-icon.fault{animation:ringpulse 1.4s infinite;}
+  .stream-on .node-icon.maintenance{animation:ringpulse 2.2s infinite;}
+  @keyframes ringpulse{
+    0%{box-shadow:0 0 0 3px rgba(0,0,0,0.2),0 0 0 0 rgba(251,103,103,0.5);}
+    70%{box-shadow:0 0 0 3px rgba(0,0,0,0.2),0 0 0 9px rgba(251,103,103,0);}
+    100%{box-shadow:0 0 0 3px rgba(0,0,0,0.2),0 0 0 0 rgba(251,103,103,0);}
+  }
+  .axial-label{
+    font-family:var(--mono);font-size:9px;color:var(--cyan);opacity:0.75;
+    background:rgba(7,11,16,0.55);padding:1px 4px;border-radius:3px;white-space:nowrap;
+  }
+ 
+  /* ---------- notifications panel ---------- */
+  .notif-list{display:flex;flex-direction:column;gap:8px;}
+  .notif-item{
+    padding:10px 11px;border-radius:9px;border:1px solid var(--border-soft);
+    background:var(--panel-2);cursor:pointer;transition:all .12s;
+  }
+  .notif-item:hover{border-color:var(--cyan-dim);transform:translateX(2px);}
+  .notif-top{display:flex;align-items:center;gap:7px;margin-bottom:4px;}
+  .notif-type{
+    font-family:var(--mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;
+    padding:2px 7px;border-radius:10px;
+  }
+  .notif-type.fault{color:var(--fault);background:rgba(251,103,103,0.12);}
+  .notif-type.maintenance{color:var(--maint);background:rgba(253,183,86,0.12);}
+  .notif-type.service{color:var(--service);background:rgba(90,184,255,0.12);}
+  .notif-code{font-family:var(--mono);font-size:12px;color:var(--text);}
+  .notif-meta{font-family:var(--mono);font-size:10px;color:var(--text-faint);margin-top:3px;}
+ 
+  /* ---------- row 3: network details / actual shape / fault log ---------- */
+  .row3{display:grid;grid-template-columns:290px 1fr 300px;gap:14px;padding:0 22px 24px;}
+  @media (max-width: 980px){ .row3{grid-template-columns:1fr;} }
+ 
+  .kv-line{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border-soft);}
+  .kv-line:last-of-type{border-bottom:none;}
+  .kv-label{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);letter-spacing:0.05em;text-transform:uppercase;}
+  .kv-value{font-family:var(--mono);font-size:12.5px;font-weight:600;}
+  .kv-value.id{color:var(--text);}
+  .badge{padding:2px 9px;border-radius:20px;font-size:10.5px;letter-spacing:0.04em;}
+  .badge.pos{color:#04120c;background:var(--active);}
+  .badge.neg{color:#fff;background:var(--fault);}
+  .badge.warn{color:#2a1a02;background:var(--maint);}
+  .badge.ok{color:#04120c;background:var(--active);}
+ 
+  .dispatch-btn{
+    width:100%;margin-top:14px;padding:11px;border-radius:24px;border:1px solid var(--cyan-dim);
+    background:rgba(79,209,197,0.08);color:var(--cyan);font-family:var(--disp);font-weight:600;
+    font-size:12px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;transition:all .15s;
+  }
+  .dispatch-btn:hover{background:rgba(79,209,197,0.16);}
+  .dispatch-btn:active{transform:scale(0.98);}
+  .dispatch-status{font-family:var(--mono);font-size:10.5px;color:var(--active);margin-top:9px;text-align:center;min-height:14px;}
+ 
+  /* ---------- dispatch confirmation modal ---------- */
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(3,6,9,0.65);z-index:200;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+    opacity:0;pointer-events:none;transition:opacity .15s;
+  }
+  .modal-backdrop.open{opacity:1;pointer-events:auto;}
+  .modal-card{
+    width:100%;max-width:420px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    transform:translateY(8px);transition:transform .15s;
+  }
+  .modal-backdrop.open .modal-card{transform:translateY(0);}
+  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:16px 18px 10px;}
+  .modal-head-title{display:flex;align-items:center;gap:8px;font-family:var(--disp);font-size:15px;font-weight:600;color:var(--fault);}
+  .modal-close{background:none;border:none;color:var(--text-faint);font-size:18px;cursor:pointer;line-height:1;padding:2px;}
+  .modal-close:hover{color:var(--text);}
+  .modal-desc{padding:0 18px 12px;font-family:var(--body);font-size:12px;color:var(--text-dim);line-height:1.55;}
+  .modal-desc b{color:var(--text);font-weight:600;}
+  .modal-kv{padding:0 18px;}
+  .modal-kv-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-soft);font-family:var(--mono);font-size:11.5px;}
+  .modal-kv-row .lbl{color:var(--text-faint);}
+  .modal-kv-row .val{color:var(--text);font-weight:600;}
+  .modal-kv-row .val.targets{color:var(--fault);}
+  .modal-fields{padding:14px 18px 4px;display:flex;flex-direction:column;gap:12px;}
+  .modal-field label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-faint);margin-bottom:5px;}
+  .modal-field input, .modal-field textarea{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+    padding:9px 11px;color:var(--text);font-family:var(--body);font-size:12.5px;resize:vertical;
+  }
+  .modal-field input:focus, .modal-field textarea:focus{outline:none;border-color:var(--cyan-dim);}
+  .modal-field.error input{border-color:var(--fault);}
+  .modal-field .err-msg{font-family:var(--mono);font-size:10px;color:var(--fault);margin-top:4px;display:none;}
+  .modal-field.error .err-msg{display:block;}
+  .modal-actions{display:flex;gap:10px;padding:16px 18px 18px;}
+  .modal-btn{flex:1;padding:11px;border-radius:9px;font-family:var(--disp);font-weight:600;font-size:12.5px;cursor:pointer;border:1px solid var(--border);}
+  .modal-btn.cancel{background:var(--panel-2);color:var(--text-dim);}
+  .modal-btn.cancel:hover{color:var(--text);}
+  .modal-btn.authorize{background:var(--fault);color:#fff;border-color:var(--fault);display:flex;align-items:center;justify-content:center;gap:7px;}
+  .modal-btn.authorize:hover{background:#ff7e7e;}
+ 
+  .shape-wrap{display:flex;align-items:center;justify-content:center;padding:8px;}
+  .shape-wrap svg{width:100%;height:auto;max-height:300px;}
+  .child-dot{transition:all .12s;}
+  .child-label{font-family:var(--mono);font-size:8px;}
+ 
+  .fault-scroll{max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;}
+  .fault-child-item{
+    display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:7px;
+    background:var(--panel-2);border:1px solid rgba(251,103,103,0.25);
+    font-family:var(--mono);font-size:11px;color:var(--fault);
+  }
+  .fault-child-item .dot{width:6px;height:6px;border-radius:50%;background:var(--fault);flex-shrink:0;}
+  .maint-block{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border-soft);}
+  .maint-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;padding:4px 0;}
+  .maint-row .lbl{color:var(--text-faint);}
+  .maint-row .val{color:var(--text-dim);}
+ 
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+ 
+  .footer-note{
+    padding:6px 22px 20px;font-family:var(--mono);font-size:10px;color:var(--text-faint);
+    letter-spacing:0.02em;
+  }
+ 
+  /* ---------- stub pages ---------- */
+  .stub-page{
+    max-width:520px;margin:60px auto;text-align:center;padding:40px 30px;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  }
+  .stub-page .stub-icon{font-size:30px;margin-bottom:14px;}
+  .stub-page h2{font-family:var(--disp);font-size:19px;margin:0 0 8px;letter-spacing:0.02em;}
+  .stub-page p{font-family:var(--body);font-size:13px;color:var(--text-dim);line-height:1.6;margin:0;}
+ 
+  /* ==================================================================
+     LIGHT ENTERPRISE THEME — Maintenance / Overview / Support pages
+     ================================================================== */
+  .light-page{
+    --lp-bg:#F8FAFC; --lp-card:#FFFFFF; --lp-border:#E2E8F0; --lp-border-soft:#EEF2F6;
+    --lp-text:#0F172A; --lp-dim:#64748B; --lp-faint:#94A3B8;
+    --lp-critical:#DC2626; --lp-critical-bg:#FEF2F2; --lp-critical-border:#FECACA;
+    --lp-high:#B91C1C; --lp-high-bg:#FEE2E2;
+    --lp-active:#059669; --lp-active-bg:#ECFDF5; --lp-active-border:#A7F3D0;
+    --lp-amber:#D97706; --lp-amber-bg:#FFFBEB; --lp-amber-border:#FDE68A;
+    --lp-blue:#2563EB; --lp-blue-bg:#EFF6FF;
+    background:var(--lp-bg);color:var(--lp-text);font-family:'Inter',sans-serif;
+    padding:22px;min-height:100vh;
+  }
+  .light-page *{box-sizing:border-box;}
+  .lp-max{max-width:1200px;margin:0 auto;}
+  .lp-card{background:var(--lp-card);border:1px solid var(--lp-border);border-radius:10px;box-shadow:0 1px 2px rgba(15,23,42,0.04);}
+  .lp-pill{
+    display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;
+    letter-spacing:0.06em;text-transform:uppercase;color:var(--lp-dim);background:var(--lp-bg);
+    border:1px solid var(--lp-border);border-radius:20px;padding:4px 10px;
+  }
+  .lp-pill.live{color:var(--lp-active);border-color:var(--lp-active-border);background:var(--lp-active-bg);}
+  .lp-pill.live .dot{width:5px;height:5px;border-radius:50%;background:var(--lp-active);}
+  .lp-badge{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.04em;padding:3px 9px;border-radius:20px;font-weight:600;}
+  .lp-badge.critical{color:var(--lp-critical);background:var(--lp-critical-bg);border:1px solid var(--lp-critical-border);}
+  .lp-badge.high{color:var(--lp-high);background:var(--lp-high-bg);}
+  .lp-badge.active{color:var(--lp-active);background:var(--lp-active-bg);border:1px solid var(--lp-active-border);}
+  .lp-badge.amber{color:var(--lp-amber);background:var(--lp-amber-bg);border:1px solid var(--lp-amber-border);}
+  .lp-badge.blue{color:var(--lp-blue);background:var(--lp-blue-bg);}
+ 
+  .lp-filterbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 18px;margin-bottom:16px;}
+  .lp-filterbar .lp-badges{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto;}
+  .lp-field{display:flex;flex-direction:column;gap:4px;min-width:150px;}
+  .lp-field label{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.08em;text-transform:uppercase;color:var(--lp-faint);}
+  .lp-select, .lp-input, .lp-textarea{
+    appearance:none;background:#fff;border:1px solid var(--lp-border);border-radius:7px;
+    padding:8px 28px 8px 10px;font-family:'Inter',sans-serif;font-size:12px;color:var(--lp-text);
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0L5 6L10 0' stroke='%2364748B' fill='none' stroke-width='1.3'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;
+  }
+  .lp-input, .lp-textarea{background-image:none;padding:9px 11px;cursor:text;}
+  .lp-input:focus, .lp-select:focus, .lp-textarea:focus{outline:none;border-color:#94A3B8;}
+  .lp-icon-btn{
+    width:34px;height:34px;border-radius:8px;border:1px solid var(--lp-border);background:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--lp-dim);flex-shrink:0;
+  }
+  .lp-icon-btn:hover{background:var(--lp-bg);}
+ 
+  .lp-grid{display:grid;grid-template-columns:290px 1fr;gap:16px;margin-bottom:22px;}
+  @media (max-width:900px){ .lp-grid{grid-template-columns:1fr;} }
+  .lp-stack{display:flex;flex-direction:column;gap:16px;}
+ 
+  .lp-card-head{padding:13px 16px;border-bottom:1px solid var(--lp-border-soft);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .lp-card-head h3{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--lp-dim);margin:0;}
+  .lp-card-body{padding:15px 16px;}
+ 
+  .lp-incharge-name{font-size:15px;font-weight:600;}
+  .lp-incharge-role{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--lp-faint);margin-top:2px;}
+  .lp-contact-row{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;color:var(--lp-dim);font-family:'JetBrains Mono',monospace;}
+ 
+  .lp-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .lp-stat-box{background:var(--lp-bg);border:1px solid var(--lp-border-soft);border-radius:8px;padding:10px 8px;text-align:center;}
+  .lp-stat-box .n{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;}
+  .lp-stat-box .n.crit{color:var(--lp-critical);}
+  .lp-stat-box .n.ok{color:var(--lp-active);}
+  .lp-stat-box .lbl{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.05em;text-transform:uppercase;color:var(--lp-faint);margin-top:3px;}
+ 
+  .lp-load-row{display:flex;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px dashed var(--lp-border-soft);}
+  .lp-load-row:last-child{border-bottom:none;}
+  .lp-load-row .lbl{color:var(--lp-faint);}
+  .lp-load-row .val{font-family:'JetBrains Mono',monospace;font-weight:600;}
+ 
+  .lp-module-card{border-radius:9px;border:1px solid var(--lp-border);padding:11px 13px;margin-bottom:9px;}
+  .lp-module-card.critical{background:var(--lp-critical-bg);border-color:var(--lp-critical-border);}
+  .lp-module-card.ok{background:#fff;}
+  .lp-module-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .lp-module-code{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12.5px;flex:1;}
+  .lp-module-meta{display:flex;align-items:center;justify-content:space-between;margin-top:7px;gap:8px;}
+  .lp-module-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--lp-dim);}
+  .lp-btn-outline{
+    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.02em;
+    padding:5px 11px;border-radius:7px;border:1px solid var(--lp-critical-border);color:var(--lp-critical);
+    background:#fff;cursor:pointer;white-space:nowrap;
+  }
+  .lp-btn-outline.ok{border-color:var(--lp-active-border);color:var(--lp-active);}
+  .lp-btn-outline:hover{filter:brightness(0.97);}
+ 
+  .lp-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;}
+  @media (max-width:760px){ .lp-kpi-row{grid-template-columns:1fr;} }
+  .lp-kpi-card{padding:16px;position:relative;}
+  .lp-kpi-title{font-size:11.5px;color:var(--lp-dim);}
+  .lp-kpi-value{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin-top:6px;}
+  .lp-kpi-sub{font-size:10.5px;color:var(--lp-faint);margin-top:4px;}
+  .lp-kpi-icon{position:absolute;top:14px;right:14px;font-size:16px;opacity:0.7;}
+ 
+  .lp-tabs{display:flex;gap:4px;background:var(--lp-bg);border:1px solid var(--lp-border-soft);border-radius:9px;padding:4px;margin-bottom:14px;}
+  .lp-tab{flex:1;text-align:center;padding:8px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--lp-dim);cursor:pointer;background:transparent;border:none;font-family:'Inter',sans-serif;}
+  .lp-tab.active{background:#fff;color:var(--lp-text);box-shadow:0 1px 2px rgba(15,23,42,0.08);}
+ 
+  .lp-queue-row{border-radius:9px;padding:11px 13px;margin-bottom:9px;position:relative;}
+  .lp-queue-row.critical{background:var(--lp-critical-bg);}
+  .lp-queue-row.high{background:var(--lp-amber-bg);}
+  .lp-queue-row.info{background:var(--lp-blue-bg);}
+  .lp-queue-top{display:flex;align-items:center;gap:8px;}
+  .lp-queue-dot{width:6px;height:6px;border-radius:50%;background:var(--lp-critical);flex-shrink:0;}
+  .lp-queue-code{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;}
+  .lp-queue-time{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--lp-dim);}
+  .lp-queue-desc{font-size:12px;margin-top:4px;color:var(--lp-text);}
+  .lp-queue-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
+  .lp-queue-loc{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--lp-faint);}
+ 
+  .lp-form-field{margin-bottom:13px;}
+  .lp-form-field label{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--lp-dim);margin-bottom:5px;font-weight:600;}
+  .lp-form-field .hint{font-size:10px;color:var(--lp-faint);margin-top:4px;}
+  .lp-form-2col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .lp-form-2col{grid-template-columns:1fr;} }
+  .lp-submit-btn{
+    width:100%;background:#0F172A;color:#fff;border:none;border-radius:9px;padding:12px;
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;
+  }
+  .lp-submit-btn:hover{background:#1e293b;}
+  .lp-form-msg{font-size:11.5px;margin-top:10px;text-align:center;font-family:'JetBrains Mono',monospace;}
+  .lp-form-msg.ok{color:var(--lp-active);}
+  .lp-form-msg.err{color:var(--lp-critical);}
+ 
+  .lp-protocol-bar{
+    display:flex;align-items:flex-start;gap:10px;padding:13px 16px;font-size:12px;color:var(--lp-dim);
+  }
+  .lp-protocol-bar b{color:var(--lp-text);}
+  .lp-empty{font-size:11.5px;color:var(--lp-faint);padding:10px 2px;font-family:'JetBrains Mono',monospace;}
+</style>
+</head>
+<body>
+ 
+<div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <div class="mark">DS</div>
+    <div>
+      <h1 style="font-size:14px;">DIVYA SYSTEM</h1>
+      <div class="sub">Grid Console</div>
+    </div>
+  </div>
+  <div class="sidebar-nav">
+    <button class="nav-item active" data-page="dashboard"><span class="ic">&#9635;</span>Dashboard</button>
+    <button class="nav-item" data-page="maintenance"><span class="ic">&#9881;</span>Maintenance</button>
+    <button class="nav-item" data-page="overview"><span class="ic">&#9776;</span>Overview &amp; Review</button>
+    <button class="nav-item" data-page="support"><span class="ic">&#9742;</span>Support System</button>
+  </div>
+  <div class="sidebar-foot">Kolkata Grid &amp; Feeder Network · Console v1.0</div>
+</nav>
+ 
+<div class="topbar">
+  <div class="brand">
+    <div class="hamburger" id="hamburger-btn"><span></span><span></span><span></span></div>
+    <div class="mark">DS</div>
+    <div>
+      <h1>DIVYA SYSTEM <span id="page-title-suffix">— Dashboard</span></h1>
+      <div class="sub">GRID &amp; FEEDER MONITORING · KOLKATA</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="live-pill"><span class="live-dot"></span>LIVE</div>
+  </div>
+</div>
+ 
+<!-- ============ DASHBOARD PAGE ============ -->
+<div id="page-dashboard">
+ 
+  <div class="selectors">
+    <div class="field">
+      <label>Location — PIN Code</label>
+      <select id="sel-pin"></select>
+    </div>
+    <div class="field">
+      <label>Feeder / Ward</label>
+      <select id="sel-ward"></select>
+    </div>
+    <div class="field">
+      <label>Section</label>
+      <select id="sel-section"></select>
+    </div>
+  </div>
+ 
+  <div class="layout">
+ 
+    <!-- LEFT: Section Details -->
+    <div class="panel">
+      <div class="panel-head"><h2>Section Details</h2></div>
+      <div class="panel-body">
+        <div class="loc-breadcrumb" id="breadcrumb">—</div>
+        <div class="incharge-row">
+          <div class="incharge-name" id="incharge-name">—</div>
+          <div class="incharge-meta" id="incharge-contact">—</div>
+        </div>
+ 
+        <div class="net-group">
+          <div class="net-group-title"><span class="dot" style="background:var(--active)"></span>Active Network</div>
+          <div class="mod-list" id="active-list"></div>
+        </div>
+ 
+        <div class="net-group">
+          <div class="net-group-title"><span class="dot" style="background:var(--fault)"></span>Faulty Network</div>
+          <div class="mod-list" id="faulty-list"></div>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- CENTER: Satellite / Mesh View -->
+    <div class="panel mesh-panel">
+      <div class="panel-head">
+        <h2>Satellite View — Network Topology</h2>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--active)"></span>Active</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--fault)"></span>Fault</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--maint)"></span>Maint.</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--service)"></span>Service</div>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="mesh-toolbar">
+        <div class="toggle-btn on" id="tg-hex"><span class="sw"></span>Cell Shapes</div>
+        <div class="toggle-btn on" id="tg-nodes"><span class="sw"></span>Node Markers</div>
+        <div class="toggle-btn" id="tg-fault-vec"><span class="sw"></span>Fault Vectors</div>
+        <div class="toggle-btn" id="tg-coords"><span class="sw"></span>(q,r,s) Vectors</div>
+        <div class="toolbar-spacer"></div>
+        <div class="toggle-btn stream-btn on" id="tg-stream"><span class="sw"></span><span id="stream-label">Pause Mesh Stream</span></div>
+      </div>
+    </div>
+ 
+    <!-- RIGHT: Notifications -->
+    <div class="panel">
+      <div class="panel-head"><h2>Notifications</h2></div>
+      <div class="panel-body">
+        <div class="notif-list" id="notif-list"></div>
+      </div>
+    </div>
+ 
+  </div>
+ 
+  <!-- ROW 3 -->
+  <div class="row3">
+ 
+    <!-- Network Details -->
+    <div class="panel">
+      <div class="panel-head"><h2>Network Details</h2></div>
+      <div class="panel-body">
+        <div class="kv-line">
+          <span class="kv-label">Network ID</span>
+          <span class="kv-value id" id="nd-id">—</span>
+        </div>
+        <div class="kv-line">
+          <span class="kv-label">Fault Report</span>
+          <span class="kv-value"><span class="badge" id="nd-fault">—</span></span>
+        </div>
+        <div class="kv-line">
+          <span class="kv-label">Maintenance Report</span>
+          <span class="kv-value"><span class="badge" id="nd-maint">—</span></span>
+        </div>
+        <button class="dispatch-btn" id="dispatch-btn">Fault Repair + Dispatch Maintenance</button>
+        <div class="dispatch-status" id="dispatch-status"></div>
+      </div>
+    </div>
+ 
+    <!-- Actual Shape -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2 class="violet">Actual Shape — Child Nodes</h2>
+        <span class="code-tag" id="shape-code">—</span>
+      </div>
+      <div class="shape-wrap" id="shape-wrap"></div>
+    </div>
+ 
+    <!-- Fault + Maintenance log -->
+    <div class="panel">
+      <div class="panel-head"><h2>Fault &amp; Maintenance Log</h2></div>
+      <div class="panel-body">
+        <div class="net-group-title">Fault Reported Child ID</div>
+        <div class="fault-scroll" id="fault-child-list"></div>
+        <div class="maint-block">
+          <div class="maint-row"><span class="lbl">Last Maintenance</span><span class="val" id="maint-last">—</span></div>
+          <div class="maint-row"><span class="lbl">Next Maintenance</span><span class="val" id="maint-next">—</span></div>
+        </div>
+      </div>
+    </div>
+ 
+  </div>
+ 
+  <div class="footer-note">Sample deployment data for demonstration · wards &amp; areas correspond to real KMC boundaries · module &amp; child-node IDs, statuses and maintenance dates are illustrative</div>
+</div>
+ 
+<!-- ============ DISPATCH CONFIRMATION MODAL ============ -->
+<div class="modal-backdrop" id="dispatch-modal-backdrop">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="modal-head-title">&#9888; Confirm Emergency Dispatch</div>
+      <button class="modal-close" id="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-desc" id="modal-desc">—</div>
+    <div class="modal-kv">
+      <div class="modal-kv-row"><span class="lbl">Feeder Node</span><span class="val" id="modal-feeder">—</span></div>
+      <div class="modal-kv-row"><span class="lbl">Target Nodes</span><span class="val targets" id="modal-targets">—</span></div>
+      <div class="modal-kv-row"><span class="lbl">Protocol Code</span><span class="val" id="modal-protocol">NEX-DISPATCH-LV3</span></div>
+    </div>
+    <div class="modal-fields">
+      <div class="modal-field" id="modal-name-field">
+        <label>Dispatcher Name</label>
+        <input type="text" id="modal-dispatcher-name" placeholder="e.g. Priya Das" />
+        <div class="err-msg">Dispatcher name is required to authorize dispatch</div>
+      </div>
+      <div class="modal-field">
+        <label>Operator Dispatch Memo (Optional)</label>
+        <textarea id="modal-memo" rows="2" placeholder="e.g. Priority dispatch for voltage sag on line B"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" id="modal-cancel-btn">Cancel</button>
+      <button class="modal-btn authorize" id="modal-authorize-btn">&#10148; Authorize Dispatch</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- ============ MAINTENANCE PAGE ============ -->
+<div id="page-maintenance" style="display:none" class="light-page">
+  <div class="lp-max">
+ 
+    <!-- Zone filter bar -->
+    <div class="lp-card lp-filterbar">
+      <div class="lp-badges">
+        <span class="lp-pill">&#128246; KOLKATA GRID TELEMETRY</span>
+        <span class="lp-pill live"><span class="dot"></span>LIVE DISPATCH</span>
+      </div>
+      <div class="lp-field">
+        <label>Location — PIN</label>
+        <select class="lp-select" id="lp-sel-pin"></select>
+      </div>
+      <div class="lp-field">
+        <label>Feeder Line</label>
+        <select class="lp-select" id="lp-sel-ward"></select>
+      </div>
+      <div class="lp-field">
+        <label>Section</label>
+        <select class="lp-select" id="lp-sel-section"></select>
+      </div>
+      <button class="lp-icon-btn" id="lp-refresh-btn" title="Refresh">&#8635;</button>
+    </div>
+ 
+    <!-- Section summary + critical/active modules -->
+    <div class="lp-grid">
+      <div class="lp-stack">
+        <div class="lp-card">
+          <div class="lp-card-head"><h3>Section In-Charge</h3><span class="lp-badge blue" id="lp-ward-tag">—</span></div>
+          <div class="lp-card-body">
+            <div class="lp-incharge-name" id="lp-incharge-name">—</div>
+            <div class="lp-incharge-role">Section Coordinator</div>
+            <div class="lp-contact-row">&#9742; <span id="lp-incharge-contact">—</span></div>
+          </div>
+        </div>
+        <div class="lp-card">
+          <div class="lp-card-body">
+            <div class="lp-stat-row">
+              <div class="lp-stat-box"><div class="n" id="lp-stat-total">—</div><div class="lbl">Total Nodes</div></div>
+              <div class="lp-stat-box"><div class="n ok" id="lp-stat-active">—</div><div class="lbl">Active Nodes</div></div>
+              <div class="lp-stat-box"><div class="n crit" id="lp-stat-critical">—</div><div class="lbl">Critical Nodes</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="lp-card">
+          <div class="lp-card-head"><h3 id="lp-load-title">Current Substation Load</h3></div>
+          <div class="lp-card-body">
+            <div class="lp-load-row"><span class="lbl">Operating Voltage</span><span class="val" id="lp-load-voltage">—</span></div>
+            <div class="lp-load-row"><span class="lbl">Current Load</span><span class="val" id="lp-load-current">—</span></div>
+          </div>
+        </div>
+      </div>
+ 
+      <div class="lp-stack">
+        <div class="lp-card">
+          <div class="lp-card-head"><h3>Multi-Critical Network Modules — Urgent View</h3><span class="lp-badge critical" id="lp-critical-count">0 Faults</span></div>
+          <div class="lp-card-body" id="lp-critical-list"></div>
+        </div>
+        <div class="lp-card">
+          <div class="lp-card-head"><h3>Active Operational Networks — Normal Health</h3><span class="lp-badge active" id="lp-active-count">0 Healthy</span></div>
+          <div class="lp-card-body" id="lp-active-modlist"></div>
+        </div>
+      </div>
+    </div>
+ 
+    <hr style="border:none;border-top:1px solid var(--lp-border);margin:26px 0;">
+ 
+    <!-- Dispatch Management & Work Orders -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
+      <div>
+        <span class="lp-pill">&#128225; TELEMETRY DISPATCH CONSOLE // KOLKATA GRID</span>
+        <h1 style="font-family:'Space Grotesk',sans-serif;font-size:23px;margin:10px 0 4px;">Dispatch Management &amp; Work Orders</h1>
+        <div style="font-size:12.5px;color:var(--lp-dim);">Monitor active fault incidents, review upcoming maintenance windows, and assign emergency repair units.</div>
+      </div>
+      <span class="lp-pill live"><span class="dot"></span>LIVE DISPATCH STREAM ACTIVE</span>
+    </div>
+ 
+    <div class="lp-kpi-row">
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#128293;</div>
+        <div class="lp-kpi-title">Overdue Fault Alarms</div>
+        <div class="lp-kpi-value" id="lp-kpi-overdue">—</div>
+        <div class="lp-kpi-sub" id="lp-kpi-overdue-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#128337;</div>
+        <div class="lp-kpi-title">Scheduled Cycles (24h)</div>
+        <div class="lp-kpi-value" id="lp-kpi-scheduled">—</div>
+        <div class="lp-kpi-sub" id="lp-kpi-scheduled-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#128663;</div>
+        <div class="lp-kpi-title">Dispatched Field Crews</div>
+        <div class="lp-kpi-value" id="lp-kpi-crews">—</div>
+        <div class="lp-kpi-sub" id="lp-kpi-crews-sub">—</div>
+      </div>
+    </div>
+ 
+    <div class="lp-grid" style="grid-template-columns:1fr 380px;">
+      <div class="lp-card">
+        <div class="lp-card-head">
+          <div>
+            <h3 style="margin-bottom:3px;">Operational Grid Queue</h3>
+            <div style="font-size:11px;color:var(--lp-faint);">Live triage and status breakdown across Kolkata zones</div>
+          </div>
+          <span class="lp-badge blue">All Sectors</span>
+        </div>
+        <div class="lp-card-body">
+          <div class="lp-tabs">
+            <button class="lp-tab active" data-tab="overdue" id="lp-tab-overdue">Overdue</button>
+            <button class="lp-tab" data-tab="scheduled" id="lp-tab-scheduled">Scheduled</button>
+            <button class="lp-tab" data-tab="crews" id="lp-tab-crews">Field Crews</button>
+          </div>
+          <div id="lp-queue-list"></div>
+        </div>
+      </div>
+ 
+      <div class="lp-card">
+        <div class="lp-card-head">
+          <div>
+            <h3 style="margin-bottom:3px;">Dispatch Management &amp; Work Order Form</h3>
+            <div style="font-size:11px;color:var(--lp-faint);">Issue formal telemetry tickets to field maintenance squads</div>
+          </div>
+          <span class="lp-badge blue">ID: WO-CREATE</span>
+        </div>
+        <div class="lp-card-body">
+          <div class="lp-form-field">
+            <label>Network ID *</label>
+            <input class="lp-input" id="wo-network-id" placeholder="e.g. P1-GIA-KOL93" />
+            <div class="hint">Enter the unique identifier of the network module</div>
+          </div>
+          <div class="lp-form-2col">
+            <div class="lp-form-field">
+              <label>Maintenance Type *</label>
+              <select class="lp-select" id="wo-type" style="width:100%;">
+                <option value="">Select maintenance type</option>
+                <option>Preventive</option>
+                <option>Corrective</option>
+                <option>Emergency</option>
+                <option>Inspection</option>
+              </select>
+            </div>
+            <div class="lp-form-field">
+              <label>Scheduled Date *</label>
+              <input class="lp-input" type="date" id="wo-date" />
+            </div>
+          </div>
+          <div class="lp-form-field">
+            <label>Assigned Technician *</label>
+            <input class="lp-input" id="wo-tech" placeholder="Technician name or ID" />
+          </div>
+          <div class="lp-form-field">
+            <label>Work Order Notes</label>
+            <textarea class="lp-textarea" id="wo-notes" rows="3" placeholder="Additional instructions or observations"></textarea>
+            <div class="hint">Provide any special instructions or details</div>
+          </div>
+          <div class="lp-form-field">
+            <label>Attach Supporting Documents</label>
+            <input class="lp-input" type="file" id="wo-file" />
+            <div class="hint">Upload diagrams, fault logs, or permits (PDF/Image, max 5MB)</div>
+          </div>
+          <button class="lp-submit-btn" id="wo-submit-btn">&#10148; Authorize &amp; Dispatch Work Order</button>
+          <div class="lp-form-msg" id="wo-msg"></div>
+        </div>
+      </div>
+    </div>
+ 
+    <div class="lp-card lp-protocol-bar" style="margin-top:16px;">
+      <span>&#9432;</span>
+      <span><b>NEXGRID Maintenance Protocol:</b> Priority level 1 alerts must be acknowledged within 15 minutes. Dispatch confirmations notify ward engineers and generate live GIS tracking coordinates.</span>
+    </div>
+ 
+  </div>
+</div>
+<!-- ============ OVERVIEW & REVIEW PAGE ============ -->
+<div id="page-overview" style="display:none" class="light-page">
+  <div class="lp-max">
+ 
+    <div class="lp-card lp-filterbar">
+      <div class="lp-badges">
+        <span class="lp-pill">&#128202; KOLKATA GRID TELEMETRY — NETWORK OVERVIEW</span>
+        <span class="lp-pill live"><span class="dot"></span>LIVE ROLLUP</span>
+      </div>
+      <div style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--lp-dim);" id="ov-updated">—</div>
+    </div>
+ 
+    <div style="margin-bottom:18px;">
+      <span class="lp-pill">&#128200; SYSTEM-WIDE ANALYTICS</span>
+      <h1 style="font-family:'Space Grotesk',sans-serif;font-size:23px;margin:10px 0 4px;">Overview &amp; Review</h1>
+      <div style="font-size:12.5px;color:var(--lp-dim);">Rollup uptime, fault trends and zone-by-zone health across all 8 Kolkata PIN zones.</div>
+    </div>
+ 
+    <div class="lp-kpi-row" style="grid-template-columns:repeat(4,1fr);">
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#128225;</div>
+        <div class="lp-kpi-title">Total Network Modules</div>
+        <div class="lp-kpi-value" id="ov-kpi-total">—</div>
+        <div class="lp-kpi-sub" id="ov-kpi-total-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#9989;</div>
+        <div class="lp-kpi-title">Grid Uptime</div>
+        <div class="lp-kpi-value" id="ov-kpi-uptime">—</div>
+        <div class="lp-kpi-sub" id="ov-kpi-uptime-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#128293;</div>
+        <div class="lp-kpi-title">Active Fault Alarms</div>
+        <div class="lp-kpi-value" id="ov-kpi-faults">—</div>
+        <div class="lp-kpi-sub" id="ov-kpi-faults-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#9203;</div>
+        <div class="lp-kpi-title">Avg Resolution Time</div>
+        <div class="lp-kpi-value" id="ov-kpi-mttr">—</div>
+        <div class="lp-kpi-sub" id="ov-kpi-mttr-sub">—</div>
+      </div>
+    </div>
+ 
+    <div class="lp-grid" style="grid-template-columns:1.3fr 1fr;">
+      <div class="lp-card">
+        <div class="lp-card-head">
+          <div><h3 style="margin-bottom:3px;">14-Day Fault Trend</h3><div style="font-size:11px;color:var(--lp-faint);">Detected incidents across the Kolkata grid</div></div>
+          <span class="lp-badge blue">All Zones</span>
+        </div>
+        <div class="lp-card-body"><div id="ov-trend-chart"></div></div>
+      </div>
+      <div class="lp-card">
+        <div class="lp-card-head"><h3>Module Status Distribution</h3></div>
+        <div class="lp-card-body" id="ov-donut"></div>
+      </div>
+    </div>
+ 
+    <div class="lp-card" style="margin-bottom:16px;">
+      <div class="lp-card-head">
+        <div><h3 style="margin-bottom:3px;">Zone-by-Zone Health</h3><div style="font-size:11px;color:var(--lp-faint);">Per-PIN rollup across wards and sections — click a row to jump to that zone</div></div>
+        <span class="lp-badge active" id="ov-zone-count">0 Zones</span>
+      </div>
+      <div class="lp-card-body" style="padding:0;">
+        <div style="overflow-x:auto;"><table id="ov-zone-table" style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;"></table></div>
+      </div>
+    </div>
+ 
+    <div class="lp-card">
+      <div class="lp-card-head">
+        <div><h3 style="margin-bottom:3px;">Review Reports</h3><div style="font-size:11px;color:var(--lp-faint);">Generated grid-health and fault root-cause reviews</div></div>
+      </div>
+      <div class="lp-card-body" id="ov-reports"></div>
+    </div>
+ 
+    <div class="lp-card lp-protocol-bar" style="margin-top:16px;">
+      <span>&#9432;</span>
+      <span><b>NEXGRID Review Cycle:</b> Zone rollups refresh continuously from live section telemetry. Uptime accounts for fault downtime at full weight and scheduled maintenance at partial weight.</span>
+    </div>
+ 
+  </div>
+</div>
+ 
+<!-- ============ SUPPORT SYSTEM PAGE ============ -->
+<div id="page-support" style="display:none" class="light-page">
+  <div class="lp-max">
+ 
+    <div class="lp-card lp-filterbar">
+      <div class="lp-badges">
+        <span class="lp-pill">&#9742; KOLKATA GRID — SUPPORT SYSTEM</span>
+        <span class="lp-pill live"><span class="dot"></span>HELPDESK ONLINE</span>
+      </div>
+    </div>
+ 
+    <div style="margin-bottom:18px;">
+      <span class="lp-pill">&#128172; FIELD SUPPORT &amp; ESCALATION</span>
+      <h1 style="font-family:'Space Grotesk',sans-serif;font-size:23px;margin:10px 0 4px;">Support System</h1>
+      <div style="font-size:12.5px;color:var(--lp-dim);">Field-team directory, ticketing and escalation workflow for on-ground support requests.</div>
+    </div>
+ 
+    <div class="lp-kpi-row">
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#128100;</div>
+        <div class="lp-kpi-title">Field Coordinators</div>
+        <div class="lp-kpi-value" id="sup-kpi-staff">—</div>
+        <div class="lp-kpi-sub" id="sup-kpi-staff-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#127915;</div>
+        <div class="lp-kpi-title">Open Tickets</div>
+        <div class="lp-kpi-value" id="sup-kpi-open">—</div>
+        <div class="lp-kpi-sub" id="sup-kpi-open-sub">—</div>
+      </div>
+      <div class="lp-card lp-kpi-card">
+        <div class="lp-kpi-icon">&#9888;</div>
+        <div class="lp-kpi-title">In Escalation</div>
+        <div class="lp-kpi-value" id="sup-kpi-esc">—</div>
+        <div class="lp-kpi-sub" id="sup-kpi-esc-sub">—</div>
+      </div>
+    </div>
+ 
+    <div class="lp-grid" style="grid-template-columns:1fr 380px;">
+      <div class="lp-card">
+        <div class="lp-card-head">
+          <div><h3 style="margin-bottom:3px;">Support Ticket Queue</h3><div style="font-size:11px;color:var(--lp-faint);">Escalation workflow across Kolkata zones</div></div>
+          <span class="lp-badge blue">All Sectors</span>
+        </div>
+        <div class="lp-card-body">
+          <div class="lp-tabs">
+            <button class="lp-tab active" data-suptab="open" id="sup-tab-open">Open</button>
+            <button class="lp-tab" data-suptab="progress" id="sup-tab-progress">In Progress</button>
+            <button class="lp-tab" data-suptab="resolved" id="sup-tab-resolved">Resolved</button>
+          </div>
+          <div id="sup-queue-list"></div>
+        </div>
+      </div>
+ 
+      <div class="lp-card">
+        <div class="lp-card-head">
+          <div><h3 style="margin-bottom:3px;">Raise Support Ticket</h3><div style="font-size:11px;color:var(--lp-faint);">Submit an on-ground support or escalation request</div></div>
+          <span class="lp-badge blue">ID: TK-CREATE</span>
+        </div>
+        <div class="lp-card-body">
+          <div class="lp-form-field">
+            <label>Subject *</label>
+            <input class="lp-input" id="tk-subject" placeholder="e.g. Repeated fault at BLG feeder" />
+          </div>
+          <div class="lp-form-2col">
+            <div class="lp-form-field">
+              <label>Category *</label>
+              <select class="lp-select" id="tk-category" style="width:100%;">
+                <option value="">Select category</option>
+                <option>Technical Fault</option>
+                <option>Equipment Request</option>
+                <option>Access / Permissions</option>
+                <option>Billing / Contract</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="lp-form-field">
+              <label>Priority *</label>
+              <select class="lp-select" id="tk-priority" style="width:100%;">
+                <option value="">Select priority</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Critical</option>
+              </select>
+            </div>
+          </div>
+          <div class="lp-form-field">
+            <label>Related Network ID</label>
+            <input class="lp-input" id="tk-network" placeholder="e.g. P1-GIA-KOL93 (optional)" />
+          </div>
+          <div class="lp-form-field">
+            <label>Description *</label>
+            <textarea class="lp-textarea" id="tk-desc" rows="3" placeholder="Describe the issue or request"></textarea>
+          </div>
+          <button class="lp-submit-btn" id="tk-submit-btn">&#9993; Submit Support Ticket</button>
+          <div class="lp-form-msg" id="tk-msg"></div>
+        </div>
+      </div>
+    </div>
+ 
+    <div class="lp-card" style="margin-top:16px;">
+      <div class="lp-card-head">
+        <div><h3 style="margin-bottom:3px;">Field Team Directory</h3><div style="font-size:11px;color:var(--lp-faint);">Section in-charges across all Kolkata zones — click a card to jump to that zone</div></div>
+        <span class="lp-badge active" id="sup-staff-count">0 Coordinators</span>
+      </div>
+      <div class="lp-card-body" id="sup-staff-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;"></div>
+    </div>
+ 
+    <div class="lp-card lp-protocol-bar" style="margin-top:16px;">
+      <span>&#9432;</span>
+      <span><b>NEXGRID Support Protocol:</b> Critical-priority tickets are auto-escalated to zone engineers and must receive first response within 30 minutes.</span>
+    </div>
+ 
+  </div>
+</div>
+ 
+<script>
+/* ===================== UTIL: seeded random ===================== */
+function hashSeed(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){ h = (Math.imul(h,31) + str.charCodeAt(i)) >>> 0; }
+  return h >>> 0;
+}
+function seededRand(seed){
+  let t = seed >>> 0;
+  return function(){
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+ 
+/* ===================== DATA ===================== */
+function mods(prefix, pinSuffix, n, fault=[], maint=[], service=[]){
+  const arr=[];
+  for(let i=1;i<=n;i++){
+    let status='active';
+    if(fault.includes(i)) status='fault';
+    else if(maint.includes(i)) status='maintenance';
+    else if(service.includes(i)) status='service';
+    arr.push({code:`P${i}-${prefix}-KOL${pinSuffix}`, status});
+  }
+  return arr;
+}
+ 
+const DATA = {
+  "700001": {
+    area:"BBD Bagh / Esplanade", lat:22.5689, lng:88.3462,
+    wards:{
+      "F-45A": { wardNo:45, sections:{
+        "North-1": { incharge:"Arjun Roy", contact:"98xxxxxx31", modules: mods('ESP','01',10,[9]) },
+        "South-1": { incharge:"Priya Das", contact:"97xxxxxx12", modules: mods('ESP','01',6) }
+      }}
+    }
+  },
+  "700003": {
+    area:"Bagbazar", lat:22.6036, lng:88.3658,
+    wards:{
+      "F-7A": { wardNo:7, sections:{
+        "North-1": { incharge:"Debashish Sen", contact:"90xxxxxx58", modules: mods('BGB','03',7,[7]) },
+        "North-2": { incharge:"Ananya Ghosh", contact:"91xxxxxx76", modules: mods('BGB','03',6) }
+      }}
+    }
+  },
+  "700006": {
+    area:"Jorasanko / Girish Park", lat:22.5878, lng:88.3613,
+    wards:{
+      "F-25A": { wardNo:25, sections:{
+        "North-1": { incharge:"Rajat Bose", contact:"98xxxxxx03", modules: mods('JGP','06',6,[],[],[1]) },
+        "North-2": { incharge:"Moumita Chatterjee", contact:"89xxxxxx44", modules: mods('JGP','06',6) }
+      }}
+    }
+  },
+  "700029": {
+    area:"Ballygunge", lat:22.5299, lng:88.3595,
+    wards:{
+      "F-69A": { wardNo:69, sections:{
+        "North-1": { incharge:"Suvro Banerjee", contact:"96xxxxxx20", modules: mods('BLG','29',8,[3]) },
+        "South-1": { incharge:"Ritika Mukherjee", contact:"90xxxxxx65", modules: mods('BLG','29',6) }
+      }}
+    }
+  },
+  "700032": {
+    area:"Dhakuria / Jadavpur University", lat:22.4998, lng:88.3697,
+    wards:{
+      "F-92A": { wardNo:92, sections:{
+        "South-1": { incharge:"Abir Sarkar", contact:"93xxxxxx88", modules: mods('JAD','32',7,[],[],[5]) },
+        "South-2": { incharge:"Sohini Dutta", contact:"97xxxxxx09", modules: mods('JAD','32',6) }
+      }}
+    }
+  },
+  "700040": {
+    area:"Tollygunge / Kudghat", lat:22.4878, lng:88.3487,
+    wards:{
+      "F-97A": { wardNo:97, sections:{
+        "South-1": { incharge:"Kaushik Pal", contact:"94xxxxxx17", modules: mods('TOL','40',7,[],[6]) },
+        "South-2": { incharge:"Nabanita Chakraborty", contact:"98xxxxxx52", modules: mods('TOL','40',6) }
+      }}
+    }
+  },
+  "700034": {
+    area:"Behala", lat:22.4968, lng:88.3198,
+    wards:{
+      "F-120A": { wardNo:120, sections:{
+        "South-1": { incharge:"Tapas Mondal", contact:"90xxxxxx23", modules: mods('BEH','34',6) },
+        "South-2": { incharge:"Ishita Bhattacharya", contact:"95xxxxxx41", modules: mods('BEH','34',6,[2]) }
+      }}
+    }
+  },
+  "700104": {
+    area:"Joka / Haridevpur", lat:22.4568, lng:88.3012,
+    wards:{
+      "F-144A": { wardNo:144, sections:{
+        "South-1": { incharge:"Rohan Saha", contact:"91xxxxxx36", modules: mods('JOK','04',6,[],[2]) },
+        "South-2": { incharge:"Debarati Ganguly", contact:"96xxxxxx60", modules: mods('JOK','04',6) }
+      }}
+    }
+  }
+};
+ 
+const NOTIFICATIONS = [
+  {type:'fault', code:'P9-ESP-KOL01', pin:'700001', ward:'F-45A', section:'North-1', meta:'BBD Bagh / Esplanade · 2 min ago'},
+  {type:'fault', code:'P7-BGB-KOL03', pin:'700003', ward:'F-7A', section:'North-1', meta:'Bagbazar · 18 min ago'},
+  {type:'fault', code:'P3-BLG-KOL29', pin:'700029', ward:'F-69A', section:'North-1', meta:'Ballygunge · 34 min ago'},
+  {type:'maintenance', code:'P6-TOL-KOL40', pin:'700040', ward:'F-97A', section:'South-1', meta:'Tollygunge · due tomorrow 10:00'},
+  {type:'maintenance', code:'P2-JOK-KOL04', pin:'700104', ward:'F-144A', section:'South-1', meta:'Joka · due in 3 days'},
+  {type:'service', code:'P1-JGP-KOL06', pin:'700006', ward:'F-25A', section:'North-1', meta:'Jorasanko · ongoing, ETA 2h'},
+  {type:'service', code:'P5-JAD-KOL32', pin:'700032', ward:'F-92A', section:'South-1', meta:'Dhakuria · ongoing, ETA 45m'}
+];
+ 
+const STATUS_COLOR = {active:'#34d399', fault:'#fb6767', maintenance:'#fdb756', service:'#5ab8ff'};
+ 
+/* ---------- enrich every module with children + maintenance dates ---------- */
+function enrichModule(mod, todayMs){
+  const seed = hashSeed(mod.code);
+  const rnd = seededRand(seed);
+  const childCount = 6 + Math.floor(rnd()*11); // 6-16
+  const faultyCount = mod.status === 'fault' ? (1 + Math.floor(rnd()*3)) : 0;
+  const faultyIdxs = new Set();
+  while(faultyIdxs.size < faultyCount){ faultyIdxs.add(1 + Math.floor(rnd()*childCount)); }
+  const children = [];
+  for(let i=1;i<=childCount;i++){ children.push({ id:'C'+i, faulty: faultyIdxs.has(i) }); }
+  const daysAgo = 30 + Math.floor(rnd()*150); // 30-179 days ago
+  const lastMaint = new Date(todayMs - daysAgo*86400000);
+  const nextMaint = new Date(lastMaint.getTime() + 90*86400000);
+  mod.seed = seed;
+  mod.children = children;
+  mod.lastMaint = lastMaint;
+  mod.nextMaint = nextMaint;
+}
+(function enrichAll(){
+  const today = Date.now();
+  Object.values(DATA).forEach(pinData=>{
+    Object.values(pinData.wards).forEach(ward=>{
+      Object.values(ward.sections).forEach(sec=>{
+        sec.modules.forEach(m=> enrichModule(m, today));
+      });
+    });
+  });
+})();
+ 
+function fmtDate(d){
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}.${mm}.${d.getFullYear()}`;
+}
+ 
+/* Dynamic hex-spiral layout: works for any module count per section (pointy-top grid, blob shapes) */
+const BLOB_SPACING_M = 95;
+const BLOB_RADIUS_M = 88;
+const HEX_DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const spiralCache = {};
+function axialSpiral(n){
+  if(spiralCache[n]) return spiralCache[n];
+  const results = [[0,0]];
+  let ring = 1;
+  while(results.length < n){
+    let q = HEX_DIRS[4][0]*ring, r = HEX_DIRS[4][1]*ring;
+    for(let side=0; side<6; side++){
+      for(let step=0; step<ring; step++){
+        results.push([q,r]);
+        q += HEX_DIRS[side][0]; r += HEX_DIRS[side][1];
+      }
+    }
+    ring++;
+  }
+  const out = results.slice(0, n);
+  spiralCache[n] = out;
+  return out;
+}
+ 
+function axialToOffset(q, r, size){
+  const x = size * Math.sqrt(3) * (q + r/2);
+  const y = size * 1.5 * r;
+  return {x, y};
+}
+function metersToLatLng(centerLat, centerLng, x, y){
+  const dLat = y / 111320;
+  const dLng = x / (111320 * Math.cos(centerLat * Math.PI/180));
+  return [centerLat + dLat, centerLng + dLng];
+}
+function blobLatLngs(centerLat, centerLng, x, y, baseR, seed, n=14){
+  const rnd = seededRand(seed);
+  const pts = [];
+  for(let i=0;i<n;i++){
+    const angle = (i/n) * Math.PI*2;
+    const r = baseR * (0.78 + 0.34*rnd());
+    const vx = x + r*Math.cos(angle);
+    const vy = y + r*Math.sin(angle);
+    pts.push(metersToLatLng(centerLat, centerLng, vx, vy));
+  }
+  return pts;
+}
+ 
+/* ===================== STATE ===================== */
+let state = { pin:null, ward:null, section:null, selectedModule:null, currentPage:'dashboard' };
+let layers = { hex:null, nodes:null, coords:null };
+let streamOn = true;
+let map = null;
+ 
+/* ===================== NAV / PAGES ===================== */
+const hamburgerBtn = document.getElementById('hamburger-btn');
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+const pageTitleSuffix = document.getElementById('page-title-suffix');
+const PAGE_LABELS = { dashboard:'Dashboard', maintenance:'Maintenance', overview:'Overview & Review', support:'Support System' };
+ 
+function openSidebar(){ sidebar.classList.add('open'); sidebarBackdrop.classList.add('open'); }
+function closeSidebar(){ sidebar.classList.remove('open'); sidebarBackdrop.classList.remove('open'); }
+hamburgerBtn.addEventListener('click', ()=>{
+  sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+});
+sidebarBackdrop.addEventListener('click', closeSidebar);
+ 
+function switchPage(page){
+  state.currentPage = page;
+  ['dashboard','maintenance','overview','support'].forEach(p=>{
+    document.getElementById('page-'+p).style.display = (p===page) ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  pageTitleSuffix.textContent = '— ' + PAGE_LABELS[page];
+  closeSidebar();
+  if(page === 'dashboard' && map){ setTimeout(()=> map.invalidateSize(), 50); }
+  if(page === 'maintenance'){ renderMaintenancePage(); }
+  if(page === 'overview'){ renderOverviewPage(); }
+  if(page === 'support'){ renderSupportPage(); }
+}
+document.querySelectorAll('.nav-item').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchPage(btn.dataset.page));
+});
+ 
+/* ===================== SELECTORS ===================== */
+const selPin = document.getElementById('sel-pin');
+const selWard = document.getElementById('sel-ward');
+const selSection = document.getElementById('sel-section');
+ 
+function populatePinSelect(){
+  selPin.innerHTML = Object.keys(DATA).map(pin =>
+    `<option value="${pin}">${pin} — ${DATA[pin].area}</option>`
+  ).join('');
+}
+function populateWardSelect(pin){
+  const wards = DATA[pin].wards;
+  selWard.innerHTML = Object.keys(wards).map(w =>
+    `<option value="${w}">${w} (Ward ${wards[w].wardNo})</option>`
+  ).join('');
+}
+function populateSectionSelect(pin, ward){
+  const sections = DATA[pin].wards[ward].sections;
+  selSection.innerHTML = Object.keys(sections).map(s =>
+    `<option value="${s}">${s}</option>`
+  ).join('');
+}
+ 
+function currentSectionData(){
+  return DATA[state.pin].wards[state.ward].sections[state.section];
+}
+function getSelectedModule(){
+  const sec = currentSectionData();
+  return sec.modules.find(m=>m.code === state.selectedModule) || sec.modules[0];
+}
+ 
+function setSelection(pin, ward, section, moduleCode){
+  state.pin = pin; state.ward = ward; state.section = section;
+  selPin.value = pin;
+  populateWardSelect(pin);
+  selWard.value = ward;
+  populateSectionSelect(pin, ward);
+  selSection.value = section;
+  const sec = currentSectionData();
+  state.selectedModule = moduleCode || sec.modules[0].code;
+  render();
+}
+ 
+selPin.addEventListener('change', ()=>{
+  const pin = selPin.value;
+  const firstWard = Object.keys(DATA[pin].wards)[0];
+  const firstSection = Object.keys(DATA[pin].wards[firstWard].sections)[0];
+  setSelection(pin, firstWard, firstSection, null);
+});
+selWard.addEventListener('change', ()=>{
+  const pin = selPin.value, ward = selWard.value;
+  const firstSection = Object.keys(DATA[pin].wards[ward].sections)[0];
+  setSelection(pin, ward, firstSection, null);
+});
+selSection.addEventListener('change', ()=>{
+  setSelection(selPin.value, selWard.value, selSection.value, null);
+});
+ 
+/* ===================== MAP ===================== */
+function initMap(){
+  map = L.map('map', { zoomControl:true, attributionControl:true }).setView([22.55,88.35], 13);
+ 
+  /* Base layer: reliable full-colour street map — always renders even if the
+     satellite CDN below is blocked by a firewall/ad-blocker, so the map is
+     never a solid black/dark rectangle. */
+  const baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'&copy; OpenStreetMap contributors',
+    subdomains:'abc', maxZoom:19
+  }).addTo(map);
+ 
+  /* Satellite imagery on top. Any tile that fails to load is left transparent
+     by Leaflet, so the colourful base layer shows through instead of black. */
+  const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS community',
+    maxZoom:19
+  }).addTo(map);
+ 
+  // If the satellite provider is unreachable altogether, fall back to the
+  // colourful street base instead of leaving a dark gap.
+  let satErrors = 0;
+  satLayer.on('tileerror', ()=>{
+    satErrors++;
+    if(satErrors > 12 && map.hasLayer(satLayer)){ map.removeLayer(satLayer); }
+  });
+ 
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; OpenStreetMap contributors &copy; CARTO',
+    subdomains:'abcd', maxZoom:19, opacity:0.9
+  }).addTo(map);
+  layers.hex = L.layerGroup().addTo(map);
+  layers.nodes = L.layerGroup().addTo(map);
+  layers.coords = L.layerGroup(); // off by default
+  layers.faultVectors = L.layerGroup(); // off by default
+}
+ 
+function renderMesh(){
+  layers.hex.clearLayers();
+  layers.nodes.clearLayers();
+  layers.coords.clearLayers();
+  layers.faultVectors.clearLayers();
+ 
+  const pinData = DATA[state.pin];
+  const secData = currentSectionData();
+  const centerLat = pinData.lat, centerLng = pinData.lng;
+  const hubLatLng = [centerLat, centerLng];
+  const slots = axialSpiral(secData.modules.length);
+  const polyBounds = [];
+ 
+  secData.modules.forEach((mod, idx)=>{
+    const [q,r] = slots[idx];
+    const s = -q-r;
+    const {x,y} = axialToOffset(q, r, BLOB_SPACING_M);
+    const center = metersToLatLng(centerLat, centerLng, x, y);
+    const verts = blobLatLngs(centerLat, centerLng, x, y, BLOB_RADIUS_M, mod.seed, 14);
+    verts.forEach(v=>polyBounds.push(v));
+ 
+    const poly = L.polygon(verts, {
+      color: STATUS_COLOR[mod.status], weight:1.4, opacity:0.6, smoothFactor:1.2,
+      fillColor: STATUS_COLOR[mod.status], fillOpacity: mod.status==='active' ? 0.07 : 0.16
+    });
+    layers.hex.addLayer(poly);
+ 
+    const isSel = state.selectedModule === mod.code;
+    const icon = L.divIcon({
+      className:'',
+      html:`<div class="node-icon ${mod.status}${isSel?' selected':''}">${idx+1}</div>`,
+      iconSize:[24,24], iconAnchor:[12,12]
+    });
+    const marker = L.marker(center, {icon});
+    marker.bindTooltip(`${mod.code} · ${mod.status.toUpperCase()}`, {direction:'top', offset:[0,-14]});
+    marker.on('click', ()=>{ selectModule(mod.code); });
+    layers.nodes.addLayer(marker);
+ 
+    const coordIcon = L.divIcon({
+      className:'',
+      html:`<div class="axial-label">(${q},${r},${s})</div>`,
+      iconSize:[0,0], iconAnchor:[-16,-4]
+    });
+    layers.coords.addLayer(L.marker(center, {icon:coordIcon, interactive:false}));
+ 
+    if(mod.status === 'fault' || mod.status === 'maintenance'){
+      const line = L.polyline([hubLatLng, center], {
+        color: STATUS_COLOR[mod.status], weight:1.4, opacity:0.65, dashArray:'2,5'
+      });
+      layers.faultVectors.addLayer(line);
+    }
+  });
+ 
+  if(polyBounds.length){
+    map.fitBounds(L.latLngBounds(polyBounds), { padding:[36,36], maxZoom:17, animate:true });
+  } else {
+    map.setView(hubLatLng, 16, { animate:true });
+  }
+ 
+  document.getElementById('map').parentElement.classList.toggle('stream-on', streamOn);
+}
+ 
+function selectModule(code){
+  state.selectedModule = code;
+  renderMesh();
+  renderSidePanel();
+  renderNetworkDetails();
+  highlightNotifSource(code);
+}
+ 
+/* ===================== SIDE PANEL (Section Details) ===================== */
+function renderSidePanel(){
+  const pinData = DATA[state.pin];
+  const wardData = pinData.wards[state.ward];
+  const secData = currentSectionData();
+ 
+  document.getElementById('breadcrumb').innerHTML =
+    `<b>Location</b> ${state.pin} · ${pinData.area}<br><b>Feeder</b> ${state.ward} (Ward ${wardData.wardNo}) &nbsp; <b>Section</b> ${state.section}`;
+ 
+  document.getElementById('incharge-name').textContent = secData.incharge;
+  document.getElementById('incharge-contact').textContent = `Contact: ${secData.contact}`;
+ 
+  const activeEl = document.getElementById('active-list');
+  const faultyEl = document.getElementById('faulty-list');
+  activeEl.innerHTML = '';
+  faultyEl.innerHTML = '';
+ 
+  secData.modules.forEach(mod=>{
+    const row = document.createElement('div');
+    row.className = 'mod-item' + (state.selectedModule===mod.code ? ' selected':'');
+    row.innerHTML = `<span class="mod-dot" style="background:${STATUS_COLOR[mod.status]}"></span><span class="mod-code">${mod.code}</span><span class="mod-status">${mod.status}</span>`;
+    row.addEventListener('click', ()=> selectModule(mod.code));
+    if(mod.status === 'active'){ activeEl.appendChild(row); }
+    else { faultyEl.appendChild(row); }
+  });
+ 
+  if(!activeEl.children.length) activeEl.innerHTML = '<div class="empty-note">No active modules in this section</div>';
+  if(!faultyEl.children.length) faultyEl.innerHTML = '<div class="empty-note">No issues in this section</div>';
+}
+ 
+/* ===================== ROW 3: Network Details ===================== */
+function renderNetworkDetails(){
+  const mod = getSelectedModule();
+  const now = Date.now();
+ 
+  document.getElementById('nd-id').textContent = mod.code;
+ 
+  const faultBadge = document.getElementById('nd-fault');
+  const isFault = mod.status === 'fault';
+  faultBadge.textContent = isFault ? 'ACTIVE' : 'NONE';
+  faultBadge.className = 'badge ' + (isFault ? 'neg' : 'pos');
+ 
+  const maintBadge = document.getElementById('nd-maint');
+  const isExpired = mod.nextMaint.getTime() < now;
+  maintBadge.textContent = isExpired ? 'EXPIRED' : 'VALID';
+  maintBadge.className = 'badge ' + (isExpired ? 'warn' : 'ok');
+ 
+  document.getElementById('dispatch-status').textContent = '';
+ 
+  renderActualShape(mod);
+  renderFaultLog(mod);
+}
+ 
+/* smooth organic blob path (SVG) via quadratic curves through a jittered ring */
+function smoothBlobPath(cx, cy, baseR, seed, n=10){
+  const rnd = seededRand(seed + 11);
+  const pts = [];
+  for(let i=0;i<n;i++){
+    const angle = (i/n) * Math.PI*2;
+    const r = baseR * (0.72 + 0.34*rnd());
+    pts.push([cx + r*Math.cos(angle), cy + r*Math.sin(angle)]);
+  }
+  const mid = (a,b)=>[(a[0]+b[0])/2, (a[1]+b[1])/2];
+  let d = `M ${mid(pts[n-1],pts[0])[0].toFixed(1)} ${mid(pts[n-1],pts[0])[1].toFixed(1)} `;
+  for(let i=0;i<n;i++){
+    const next = pts[(i+1)%n];
+    const m = mid(pts[i], next);
+    d += `Q ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)} ${m[0].toFixed(1)} ${m[1].toFixed(1)} `;
+  }
+  d += 'Z';
+  return d;
+}
+ 
+function renderActualShape(mod){
+  document.getElementById('shape-code').textContent = mod.code;
+  const wrap = document.getElementById('shape-wrap');
+  const W = 320, H = 260, cx = 160, cy = 128, baseR = 92;
+  const path = smoothBlobPath(cx, cy, baseR, mod.seed, 11);
+ 
+  const rnd = seededRand(mod.seed + 42);
+  const n = mod.children.length;
+  const childrenSvg = mod.children.map((c, i)=>{
+    const angle = i * 137.508 * Math.PI/180; // golden-angle spiral
+    const frac = (i+1)/(n+1);
+    const r = baseR * 0.78 * Math.sqrt(frac);
+    const jx = (rnd()-0.5)*7, jy = (rnd()-0.5)*7;
+    const x = cx + r*Math.cos(angle) + jx;
+    const y = cy + r*Math.sin(angle) + jy;
+    const color = c.faulty ? 'var(--fault)' : 'var(--violet)';
+    return `<g>
+      <circle class="child-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${c.faulty?3.6:2.6}" fill="${color}" ${c.faulty?'style="filter:drop-shadow(0 0 4px var(--fault))"':''}></circle>
+      <text class="child-label" x="${x.toFixed(1)}" y="${(y-6).toFixed(1)}" text-anchor="middle" fill="${color}" opacity="0.9">${c.id}</text>
+    </g>`;
+  }).join('');
+ 
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      <path d="${path}" fill="rgba(167,139,250,0.08)" stroke="var(--violet)" stroke-width="1.6"></path>
+      ${childrenSvg}
+      <text x="${cx}" y="${cy+2}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-faint)">${mod.code}</text>
+    </svg>`;
+}
+ 
+function renderFaultLog(mod){
+  const listEl = document.getElementById('fault-child-list');
+  const faulty = mod.children.filter(c=>c.faulty);
+  if(faulty.length){
+    listEl.innerHTML = faulty.map(c=>
+      `<div class="fault-child-item"><span class="dot"></span>${c.id}-${mod.code}</div>`
+    ).join('');
+  } else {
+    listEl.innerHTML = '<div class="empty-note">No faults reported</div>';
+  }
+  document.getElementById('maint-last').textContent = fmtDate(mod.lastMaint);
+  document.getElementById('maint-next').textContent = fmtDate(mod.nextMaint);
+}
+ 
+document.getElementById('dispatch-btn').addEventListener('click', openDispatchModal);
+ 
+/* ===================== DISPATCH MODAL ===================== */
+const dispatchBackdrop = document.getElementById('dispatch-modal-backdrop');
+const dispatchNameInput = document.getElementById('modal-dispatcher-name');
+const dispatchNameField = document.getElementById('modal-name-field');
+const dispatchMemoInput = document.getElementById('modal-memo');
+ 
+function openDispatchModal(){
+  const mod = getSelectedModule();
+  const secData = currentSectionData();
+  const faultyChildren = mod.children.filter(c=>c.faulty).map(c=>c.id);
+ 
+  document.getElementById('modal-desc').innerHTML =
+    `Initiate rapid field crew deployment for module <b>${mod.code}</b>. This action alerts Section In-Charge <b>${secData.incharge} (+91 ${secData.contact})</b> and logs an emergency ticket with Central Dispatch.`;
+  document.getElementById('modal-feeder').textContent = `${state.ward} (${state.section})`;
+  document.getElementById('modal-targets').textContent = faultyChildren.length ? faultyChildren.join(', ') : 'None flagged';
+ 
+  dispatchNameInput.value = '';
+  dispatchMemoInput.value = '';
+  dispatchNameField.classList.remove('error');
+ 
+  dispatchBackdrop.classList.add('open');
+}
+function closeDispatchModal(){ dispatchBackdrop.classList.remove('open'); }
+ 
+document.getElementById('modal-close-btn').addEventListener('click', closeDispatchModal);
+document.getElementById('modal-cancel-btn').addEventListener('click', closeDispatchModal);
+dispatchBackdrop.addEventListener('click', (e)=>{ if(e.target === dispatchBackdrop) closeDispatchModal(); });
+ 
+document.getElementById('modal-authorize-btn').addEventListener('click', ()=>{
+  if(!dispatchNameInput.value.trim()){
+    dispatchNameField.classList.add('error');
+    dispatchNameInput.focus();
+    return;
+  }
+  const mod = getSelectedModule();
+  const dispatcherName = dispatchNameInput.value.trim();
+  const today = new Date();
+  mod.lastMaint = today;
+  mod.nextMaint = new Date(today.getTime() + 90*86400000);
+  mod.children.forEach(c=> c.faulty = false);
+  mod.status = 'active';
+ 
+  closeDispatchModal();
+  document.getElementById('dispatch-status').textContent = `✓ Dispatch authorized by ${dispatcherName} — next maintenance due ${fmtDate(mod.nextMaint)}`;
+  renderSidePanel();
+  renderMesh();
+  renderNetworkDetails();
+});
+ 
+/* ===================== NOTIFICATIONS ===================== */
+function renderNotifications(){
+  const list = document.getElementById('notif-list');
+  list.innerHTML = '';
+  NOTIFICATIONS.forEach(n=>{
+    const item = document.createElement('div');
+    item.className = 'notif-item';
+    item.dataset.code = n.code;
+    const label = n.type === 'fault' ? 'Fault detected' : n.type === 'maintenance' ? 'Maintenance due' : 'Service ongoing';
+    item.innerHTML = `
+      <div class="notif-top"><span class="notif-type ${n.type}">${label}</span></div>
+      <div class="notif-code">${n.code}</div>
+      <div class="notif-meta">${n.meta}</div>`;
+    item.addEventListener('click', ()=>{
+      setSelection(n.pin, n.ward, n.section, n.code);
+    });
+    list.appendChild(item);
+  });
+}
+function highlightNotifSource(code){
+  document.querySelectorAll('.notif-item').forEach(el=>{
+    el.style.borderColor = el.dataset.code === code ? 'var(--cyan)' : '';
+  });
+}
+ 
+/* ===================== TOOLBAR TOGGLES ===================== */
+function wireToggle(id, layerKey, defaultOn){
+  const btn = document.getElementById(id);
+  let on = defaultOn;
+  const apply = ()=>{
+    btn.classList.toggle('on', on);
+    if(on) map.addLayer(layers[layerKey]); else map.removeLayer(layers[layerKey]);
+  };
+  apply();
+  btn.addEventListener('click', ()=>{ on = !on; apply(); });
+}
+function wireStreamToggle(){
+  const btn = document.getElementById('tg-stream');
+  const label = document.getElementById('stream-label');
+  const apply = ()=>{
+    btn.classList.toggle('on', streamOn);
+    label.textContent = streamOn ? 'Pause Mesh Stream' : 'Resume Mesh Stream';
+    document.getElementById('map').parentElement.classList.toggle('stream-on', streamOn);
+  };
+  apply();
+  btn.addEventListener('click', ()=>{ streamOn = !streamOn; apply(); });
+}
+ 
+/* ===================== MAINTENANCE PAGE ===================== */
+const INCIDENT_LABELS = ['Transformer Phase Breakdown','Optical Ground Wire Severed','Substation Ring Feed Failure','Voltage Sag Detected','Line Insulation Fault','Feeder Overcurrent Trip','Busbar Contact Wear','Relay Coordination Alarm'];
+let lpState = { pin:null, ward:null, section:null, tab:'overdue' };
+let lpInitialized = false;
+ 
+function lpCurrentSection(){ return DATA[lpState.pin].wards[lpState.ward].sections[lpState.section]; }
+ 
+function lpPopulatePin(){
+  const sel = document.getElementById('lp-sel-pin');
+  sel.innerHTML = Object.keys(DATA).map(pin => `<option value="${pin}">${pin} — ${DATA[pin].area}</option>`).join('');
+}
+function lpPopulateWard(pin){
+  const sel = document.getElementById('lp-sel-ward');
+  const wards = DATA[pin].wards;
+  sel.innerHTML = Object.keys(wards).map(w => `<option value="${w}">${w} (Ward ${wards[w].wardNo})</option>`).join('');
+}
+function lpPopulateSection(pin, ward){
+  const sel = document.getElementById('lp-sel-section');
+  const sections = DATA[pin].wards[ward].sections;
+  sel.innerHTML = Object.keys(sections).map(s => `<option value="${s}">${s}</option>`).join('');
+}
+ 
+function lpSetSelection(pin, ward, section){
+  lpState.pin = pin; lpState.ward = ward; lpState.section = section;
+  document.getElementById('lp-sel-pin').value = pin;
+  lpPopulateWard(pin);
+  document.getElementById('lp-sel-ward').value = ward;
+  lpPopulateSection(pin, ward);
+  document.getElementById('lp-sel-section').value = section;
+  renderMaintenancePage();
+}
+ 
+function lpInitControls(){
+  lpPopulatePin();
+  document.getElementById('lp-sel-pin').addEventListener('change', (e)=>{
+    const pin = e.target.value;
+    const firstWard = Object.keys(DATA[pin].wards)[0];
+    const firstSection = Object.keys(DATA[pin].wards[firstWard].sections)[0];
+    lpSetSelection(pin, firstWard, firstSection);
+  });
+  document.getElementById('lp-sel-ward').addEventListener('change', (e)=>{
+    const pin = document.getElementById('lp-sel-pin').value, ward = e.target.value;
+    const firstSection = Object.keys(DATA[pin].wards[ward].sections)[0];
+    lpSetSelection(pin, ward, firstSection);
+  });
+  document.getElementById('lp-sel-section').addEventListener('change', (e)=>{
+    lpSetSelection(document.getElementById('lp-sel-pin').value, document.getElementById('lp-sel-ward').value, e.target.value);
+  });
+  document.getElementById('lp-refresh-btn').addEventListener('click', renderMaintenancePage);
+  document.querySelectorAll('.lp-tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      lpState.tab = btn.dataset.tab;
+      document.querySelectorAll('.lp-tab').forEach(b=> b.classList.toggle('active', b===btn));
+      renderLpQueue();
+    });
+  });
+  document.getElementById('wo-submit-btn').addEventListener('click', lpSubmitWorkOrder);
+}
+ 
+function renderMaintenancePage(){
+  if(!lpState.pin){
+    lpState.pin = state.pin; lpState.ward = state.ward; lpState.section = state.section;
+  }
+  if(!lpInitialized){
+    document.getElementById('lp-sel-pin').value = lpState.pin;
+    lpPopulateWard(lpState.pin);
+    document.getElementById('lp-sel-ward').value = lpState.ward;
+    lpPopulateSection(lpState.pin, lpState.ward);
+    document.getElementById('lp-sel-section').value = lpState.section;
+    lpInitialized = true;
+  }
+  renderLpSectionInfo();
+  renderLpModuleLists();
+  renderLpKpis();
+  renderLpQueue();
+}
+ 
+function renderLpSectionInfo(){
+  const pinData = DATA[lpState.pin];
+  const wardData = pinData.wards[lpState.ward];
+  const secData = lpCurrentSection();
+  const seed = hashSeed(lpState.pin + lpState.ward + lpState.section);
+  const rnd = seededRand(seed);
+ 
+  document.getElementById('lp-ward-tag').textContent = `${lpState.ward} · ${lpState.section}`;
+  document.getElementById('lp-incharge-name').textContent = secData.incharge;
+  document.getElementById('lp-incharge-contact').textContent = `+91 ${secData.contact}`;
+ 
+  const total = secData.modules.length;
+  const active = secData.modules.filter(m=>m.status==='active').length;
+  const critical = secData.modules.filter(m=>m.status==='fault').length;
+  document.getElementById('lp-stat-total').textContent = total;
+  document.getElementById('lp-stat-active').textContent = active;
+  document.getElementById('lp-stat-critical').textContent = critical;
+ 
+  document.getElementById('lp-load-title').textContent = `Current Substation Load — Feeder ${lpState.ward}`;
+  const voltage = (21.5 + rnd()*1.8).toFixed(1);
+  const current = (60 + rnd()*35).toFixed(1);
+  document.getElementById('lp-load-voltage').textContent = `${voltage} kV (Normal ±1.5%)`;
+  document.getElementById('lp-load-current').textContent = `${current} Amp (${Math.round(40+rnd()*45)}% Threshold)`;
+}
+ 
+function renderLpModuleLists(){
+  const secData = lpCurrentSection();
+  const criticalMods = secData.modules.filter(m=>m.status==='fault');
+  const activeMods = secData.modules.filter(m=>m.status==='active');
+ 
+  document.getElementById('lp-critical-count').textContent = `${criticalMods.length} Fault${criticalMods.length===1?'':'s'} Detected`;
+  document.getElementById('lp-active-count').textContent = `${activeMods.length} Healthy`;
+ 
+  const critEl = document.getElementById('lp-critical-list');
+  critEl.innerHTML = criticalMods.length ? criticalMods.map(m=>{
+    const inspecting = m._inspecting;
+    return `<div class="lp-module-card critical">
+      <div class="lp-module-top"><span class="lp-module-code">${m.code}</span><span class="lp-badge critical">CRITICAL ALARM</span></div>
+      <div class="lp-module-meta">
+        <span class="lp-module-sub">${inspecting? 'Inspecting…' : (m.children.filter(c=>c.faulty).length + ' faulty child node(s)')}</span>
+        <button class="lp-btn-outline" data-code="${m.code}">${inspecting ? 'Inspecting' : 'Inspect'}</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="lp-empty">No critical modules in this section</div>';
+ 
+  critEl.querySelectorAll('.lp-btn-outline').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const mod = secData.modules.find(m=>m.code===btn.dataset.code);
+      mod._inspecting = !mod._inspecting;
+      renderLpModuleLists();
+    });
+  });
+ 
+  const activeEl = document.getElementById('lp-active-modlist');
+  activeEl.innerHTML = activeMods.length ? activeMods.map(m=>{
+    const seed = hashSeed(m.code+'health');
+    const health = 92 + (seed % 8);
+    return `<div class="lp-module-card ok">
+      <div class="lp-module-top"><span class="lp-module-code">${m.code}</span><span class="lp-badge active">HEALTH ${health}%</span></div>
+      <div class="lp-module-meta">
+        <span class="lp-module-sub">${m.children.length} nodes</span>
+        <button class="lp-btn-outline ok" data-code="${m.code}">Select</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="lp-empty">No active modules in this section</div>';
+ 
+  activeEl.querySelectorAll('.lp-btn-outline').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.getElementById('wo-network-id').value = btn.dataset.code;
+    });
+  });
+}
+ 
+function lpAggregateAll(){
+  const fault = [], maint = [], crews = [];
+  Object.entries(DATA).forEach(([pin, pinData])=>{
+    Object.entries(pinData.wards).forEach(([ward, wardData])=>{
+      Object.entries(wardData.sections).forEach(([section, secData])=>{
+        let sectionHasIssue = false;
+        secData.modules.forEach(m=>{
+          const ctx = { mod:m, pin, pinArea:pinData.area, ward, section, secData };
+          if(m.status === 'fault'){ fault.push(ctx); sectionHasIssue = true; }
+          if(m.status === 'maintenance'){ maint.push(ctx); sectionHasIssue = true; }
+        });
+        crews.push({ pin, pinArea:pinData.area, ward, section, secData, dispatched: sectionHasIssue });
+      });
+    });
+  });
+  return { fault, maint, crews };
+}
+ 
+function renderLpKpis(){
+  const { fault, maint, crews } = lpAggregateAll();
+  const dispatchedCrews = crews.filter(c=>c.dispatched);
+ 
+  document.getElementById('lp-kpi-overdue').textContent = fault.length;
+  document.getElementById('lp-kpi-overdue-sub').textContent = `${fault.length} unacknowledged across all sectors`;
+  document.getElementById('lp-kpi-scheduled').textContent = maint.length;
+  document.getElementById('lp-kpi-scheduled-sub').textContent = `${maint.length} pending dispatch`;
+  document.getElementById('lp-kpi-crews').textContent = dispatchedCrews.length;
+  document.getElementById('lp-kpi-crews-sub').textContent = `${Math.round((dispatchedCrews.length/Math.max(crews.length,1))*100)}% sector coverage`;
+}
+ 
+function renderLpQueue(){
+  const { fault, maint, crews } = lpAggregateAll();
+  const listEl = document.getElementById('lp-queue-list');
+  document.getElementById('lp-tab-overdue').textContent = `Overdue (${fault.length})`;
+  document.getElementById('lp-tab-scheduled').textContent = `Scheduled (${maint.length})`;
+  document.getElementById('lp-tab-crews').textContent = `Field Crews (${crews.filter(c=>c.dispatched).length})`;
+ 
+  if(lpState.tab === 'overdue'){
+    listEl.innerHTML = fault.length ? fault.map(ctx=>{
+      const seed = hashSeed(ctx.mod.code);
+      const rnd = seededRand(seed);
+      const hrs = 1 + Math.floor(rnd()*24);
+      const severity = (seed % 3 === 0) ? 'HIGH' : 'CRITICAL';
+      const label = INCIDENT_LABELS[seed % INCIDENT_LABELS.length];
+      return `<div class="lp-queue-row ${severity==='CRITICAL'?'critical':'high'}">
+        <div class="lp-queue-top">
+          <span class="lp-queue-dot" style="background:${severity==='CRITICAL'?'var(--lp-critical)':'var(--lp-amber)'}"></span>
+          <span class="lp-queue-code">${ctx.mod.code}</span>
+          <span class="lp-badge ${severity==='CRITICAL'?'critical':'high'}">${severity}</span>
+          <span class="lp-queue-time">+${hrs}h Overdue</span>
+        </div>
+        <div class="lp-queue-desc">${label}</div>
+        <div class="lp-queue-bottom">
+          <span class="lp-queue-loc">${ctx.pinArea} · Ward ${ctx.ward} (${ctx.section})</span>
+          <button class="lp-btn-outline" data-pin="${ctx.pin}" data-ward="${ctx.ward}" data-section="${ctx.section}" data-code="${ctx.mod.code}">Triage Module</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="lp-empty">No overdue fault alarms</div>';
+  } else if(lpState.tab === 'scheduled'){
+    listEl.innerHTML = maint.length ? maint.map(ctx=>{
+      return `<div class="lp-queue-row high">
+        <div class="lp-queue-top">
+          <span class="lp-queue-dot" style="background:var(--lp-amber)"></span>
+          <span class="lp-queue-code">${ctx.mod.code}</span>
+          <span class="lp-badge high">MAINTENANCE</span>
+          <span class="lp-queue-time">${fmtDate(ctx.mod.nextMaint)}</span>
+        </div>
+        <div class="lp-queue-desc">Scheduled preventive maintenance cycle</div>
+        <div class="lp-queue-bottom">
+          <span class="lp-queue-loc">${ctx.pinArea} · Ward ${ctx.ward} (${ctx.section})</span>
+          <button class="lp-btn-outline" data-pin="${ctx.pin}" data-ward="${ctx.ward}" data-section="${ctx.section}" data-code="${ctx.mod.code}">Triage Module</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="lp-empty">No scheduled cycles pending</div>';
+  } else {
+    const dispatched = crews.filter(c=>c.dispatched);
+    listEl.innerHTML = dispatched.length ? dispatched.map(c=>{
+      const seed = hashSeed(c.pin+c.ward+c.section+'crew');
+      const statuses = ['En Route','On Site','Assessing'];
+      const st = statuses[seed % statuses.length];
+      return `<div class="lp-queue-row info">
+        <div class="lp-queue-top">
+          <span class="lp-queue-dot" style="background:var(--lp-blue)"></span>
+          <span class="lp-queue-code">${c.secData.incharge}</span>
+          <span class="lp-badge blue">${st}</span>
+        </div>
+        <div class="lp-queue-desc">Assigned to ${c.ward} (${c.section})</div>
+        <div class="lp-queue-bottom">
+          <span class="lp-queue-loc">${c.pinArea} · +91 ${c.secData.contact}</span>
+          <button class="lp-btn-outline" data-pin="${c.pin}" data-ward="${c.ward}" data-section="${c.section}">View Zone</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="lp-empty">No field crews currently dispatched</div>';
+  }
+ 
+  listEl.querySelectorAll('.lp-btn-outline').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      lpSetSelection(btn.dataset.pin, btn.dataset.ward, btn.dataset.section);
+      if(btn.dataset.code){ document.getElementById('wo-network-id').value = btn.dataset.code; }
+    });
+  });
+}
+ 
+function lpSubmitWorkOrder(){
+  const networkId = document.getElementById('wo-network-id').value.trim();
+  const type = document.getElementById('wo-type').value;
+  const date = document.getElementById('wo-date').value;
+  const tech = document.getElementById('wo-tech').value.trim();
+  const msgEl = document.getElementById('wo-msg');
+ 
+  if(!networkId || !type || !date || !tech){
+    msgEl.className = 'lp-form-msg err';
+    msgEl.textContent = '✕ Please fill all required fields (marked *) before dispatching.';
+    return;
+  }
+  msgEl.className = 'lp-form-msg ok';
+  msgEl.textContent = `✓ Work order authorized for ${networkId} — ${type} scheduled ${date}, assigned to ${tech}.`;
+  document.getElementById('wo-network-id').value = '';
+  document.getElementById('wo-type').value = '';
+  document.getElementById('wo-date').value = '';
+  document.getElementById('wo-tech').value = '';
+  document.getElementById('wo-notes').value = '';
+}
+ 
+/* ===================== OVERVIEW & REVIEW PAGE ===================== */
+function ovAggregateAll(){
+  const zones = [];
+  const totals = {total:0, active:0, fault:0, maintenance:0, service:0};
+  Object.entries(DATA).forEach(([pin, pinData])=>{
+    const zt = {total:0, active:0, fault:0, maintenance:0, service:0, wards:0};
+    Object.values(pinData.wards).forEach(wardData=>{
+      zt.wards++;
+      Object.values(wardData.sections).forEach(sec=>{
+        sec.modules.forEach(m=>{
+          zt.total++; zt[m.status] = (zt[m.status]||0) + 1;
+        });
+      });
+    });
+    Object.keys(totals).forEach(k=> totals[k] += (zt[k]||0));
+    zones.push({pin, area:pinData.area, ...zt});
+  });
+  return {zones, totals};
+}
+ 
+const REVIEW_REPORTS = [
+  {title:'Weekly Grid Health Report', meta:'System-wide · generated Mon, 18 Aug', kind:'active', tag:'HEALTH'},
+  {title:'Fault Root-Cause Review — Ballygunge', meta:'Ward F-69A · generated Sat, 16 Aug', kind:'critical', tag:'ROOT-CAUSE'},
+  {title:'Preventive Maintenance Compliance', meta:'All zones · generated Wed, 13 Aug', kind:'blue', tag:'COMPLIANCE'},
+  {title:'Feeder Load Audit — Q3', meta:'System-wide · generated Mon, 04 Aug', kind:'amber', tag:'AUDIT'}
+];
+ 
+function renderOverviewPage(){
+  const {zones, totals} = ovAggregateAll();
+  document.getElementById('ov-updated').textContent = 'Last rollup ' + new Date().toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+ 
+  document.getElementById('ov-kpi-total').textContent = totals.total;
+  document.getElementById('ov-kpi-total-sub').textContent = `${zones.length} PIN zones · ${zones.reduce((s,z)=>s+z.wards,0)} feeder wards`;
+ 
+  const uptime = Math.max(0, 100 - (totals.fault/totals.total)*100 - (totals.maintenance/totals.total)*35).toFixed(2);
+  document.getElementById('ov-kpi-uptime').textContent = uptime + '%';
+  document.getElementById('ov-kpi-uptime-sub').textContent = `${totals.active} of ${totals.total} nodes fully active`;
+ 
+  document.getElementById('ov-kpi-faults').textContent = totals.fault;
+  document.getElementById('ov-kpi-faults-sub').textContent = `${totals.maintenance} maintenance · ${totals.service} in service`;
+ 
+  const rnd = seededRand(hashSeed('mttr-overview'));
+  document.getElementById('ov-kpi-mttr').textContent = (2.5 + rnd()*3).toFixed(1) + 'h';
+  document.getElementById('ov-kpi-mttr-sub').textContent = 'Mean time to resolution, 30-day trailing';
+ 
+  renderOvTrend(totals);
+  renderOvDonut(totals);
+  renderOvZoneTable(zones);
+  renderOvReports();
+}
+ 
+function renderOvTrend(totals){
+  const days = 14;
+  const rnd = seededRand(hashSeed('trend-overview'));
+  const vals = [];
+  for(let i=0;i<days;i++){ vals.push(1 + Math.floor(rnd()*5)); }
+  vals[vals.length-1] = Math.max(1, totals.fault);
+  const max = Math.max(...vals, 1);
+  const today = new Date();
+  const bars = vals.map((v,i)=>{
+    const d = new Date(today.getTime() - (days-1-i)*86400000);
+    const label = d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
+    const h = Math.round((v/max)*100);
+    const isLast = i === vals.length-1;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-faint);">${v}</div>
+      <div style="width:100%;max-width:20px;height:90px;display:flex;align-items:flex-end;">
+        <div style="width:100%;height:${h}%;border-radius:3px 3px 0 0;background:${isLast ? 'var(--lp-critical)' : 'var(--lp-blue)'};"></div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--lp-faint);">${label}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('ov-trend-chart').innerHTML = `<div style="display:flex;align-items:flex-end;gap:4px;">${bars}</div>`;
+}
+ 
+function renderOvDonut(totals){
+  const segs = [
+    {label:'Active', color:'#059669', v:totals.active},
+    {label:'Fault', color:'#DC2626', v:totals.fault},
+    {label:'Maintenance', color:'#D97706', v:totals.maintenance},
+    {label:'Service', color:'#2563EB', v:totals.service}
+  ];
+  const sum = segs.reduce((s,x)=>s+x.v,0) || 1;
+  let acc = 0;
+  const stops = segs.map(s=>{
+    const start = (acc/sum)*360; acc += s.v; const end = (acc/sum)*360;
+    return `${s.color} ${start}deg ${end}deg`;
+  }).join(', ');
+  const legend = segs.map(s=> `<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;margin-bottom:8px;">
+    <span style="width:9px;height:9px;border-radius:2px;background:${s.color};flex-shrink:0;"></span>
+    <span style="flex:1;color:var(--lp-dim);">${s.label}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">${s.v}</span>
+  </div>`).join('');
+  document.getElementById('ov-donut').innerHTML = `
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(${stops});position:relative;flex-shrink:0;">
+        <div style="position:absolute;inset:16px;background:var(--lp-card);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;">${sum}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--lp-faint);">NODES</div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:140px;">${legend}</div>
+    </div>`;
+}
+ 
+function renderOvZoneTable(zones){
+  document.getElementById('ov-zone-count').textContent = `${zones.length} Zones`;
+  const head = `<tr style="text-align:left;border-bottom:1px solid var(--lp-border);">
+    ${['PIN','Area','Wards','Total','Active','Fault','Maint.','Uptime'].map(h=>`<th style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:0.05em;text-transform:uppercase;color:var(--lp-faint);">${h}</th>`).join('')}
+  </tr>`;
+  const rows = zones.map(z=>{
+    const uptime = Math.max(0, 100 - (z.fault/z.total)*100 - ((z.maintenance||0)/z.total)*35).toFixed(1);
+    return `<tr class="ov-zone-row" data-pin="${z.pin}" style="border-bottom:1px solid var(--lp-border-soft);cursor:pointer;">
+      <td style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-weight:600;">${z.pin}</td>
+      <td style="padding:10px 14px;">${z.area}</td>
+      <td style="padding:10px 14px;">${z.wards}</td>
+      <td style="padding:10px 14px;">${z.total}</td>
+      <td style="padding:10px 14px;color:var(--lp-active);">${z.active}</td>
+      <td style="padding:10px 14px;color:${z.fault ? 'var(--lp-critical)' : 'var(--lp-faint)'};">${z.fault}</td>
+      <td style="padding:10px 14px;color:${z.maintenance ? 'var(--lp-amber)' : 'var(--lp-faint)'};">${z.maintenance||0}</td>
+      <td style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-weight:600;">${uptime}%</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('ov-zone-table').innerHTML = head + rows;
+  document.querySelectorAll('.ov-zone-row').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const pin = row.dataset.pin;
+      const firstWard = Object.keys(DATA[pin].wards)[0];
+      const firstSection = Object.keys(DATA[pin].wards[firstWard].sections)[0];
+      switchPage('dashboard');
+      setSelection(pin, firstWard, firstSection);
+    });
+  });
+}
+ 
+function renderOvReports(){
+  document.getElementById('ov-reports').innerHTML = REVIEW_REPORTS.map(r=>`
+    <div class="lp-module-card ok" style="margin-bottom:9px;">
+      <div class="lp-module-top">
+        <span class="lp-module-code" style="font-family:'Inter',sans-serif;font-weight:600;font-size:13px;">${r.title}</span>
+        <span class="lp-badge ${r.kind}">${r.tag}</span>
+      </div>
+      <div class="lp-module-meta">
+        <span class="lp-module-sub">${r.meta}</span>
+        <button class="lp-btn-outline ok" data-title="${r.title}">View Report</button>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('#ov-reports .lp-btn-outline').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const original = btn.textContent;
+      btn.textContent = 'Opening…';
+      setTimeout(()=>{
+        btn.textContent = original;
+        alert(`${btn.dataset.title}\n\nThis is a sample report preview — wire this up to your reporting backend to render the full document.`);
+      }, 250);
+    });
+  });
+}
+ 
+/* ===================== SUPPORT SYSTEM PAGE ===================== */
+const TICKET_CATEGORIES = ['Technical Fault','Equipment Request','Access / Permissions','Billing / Contract','Other'];
+let supState = { tab:'open' };
+ 
+function supAggregateStaff(){
+  const staff = [];
+  Object.entries(DATA).forEach(([pin, pinData])=>{
+    Object.entries(pinData.wards).forEach(([ward, wardData])=>{
+      Object.entries(wardData.sections).forEach(([section, secData])=>{
+        const rnd = seededRand(hashSeed(pin+ward+section+'staffstatus'));
+        const statuses = ['Available','On Field','Off Duty'];
+        const st = statuses[Math.floor(rnd()*statuses.length)];
+        staff.push({ pin, pinArea:pinData.area, ward, section, incharge:secData.incharge, contact:secData.contact, status:st });
+      });
+    });
+  });
+  return staff;
+}
+ 
+function supAggregateTickets(){
+  const open=[], progress=[], resolved=[];
+  Object.entries(DATA).forEach(([pin, pinData])=>{
+    Object.entries(pinData.wards).forEach(([ward, wardData])=>{
+      Object.entries(wardData.sections).forEach(([section, secData])=>{
+        secData.modules.forEach(m=>{
+          const seed = hashSeed(m.code+'ticket');
+          const ctx = {mod:m, pin, pinArea:pinData.area, ward, section, secData};
+          if(m.status === 'fault'){
+            open.push({...ctx, category:'Technical Fault', priority:(seed % 3 === 0) ? 'High' : 'Critical'});
+          } else if(m.status === 'maintenance'){
+            progress.push({...ctx, category:'Technical Fault', priority:'Medium'});
+          } else if(m.status === 'service'){
+            progress.push({...ctx, category:'Equipment Request', priority:'Medium'});
+          } else if(seed % 9 === 0){
+            resolved.push({...ctx, category: TICKET_CATEGORIES[seed % TICKET_CATEGORIES.length], priority:'Low'});
+          }
+        });
+      });
+    });
+  });
+  return {open, progress, resolved};
+}
+ 
+function renderSupportPage(){
+  const staff = supAggregateStaff();
+  const tickets = supAggregateTickets();
+ 
+  document.getElementById('sup-kpi-staff').textContent = staff.length;
+  document.getElementById('sup-kpi-staff-sub').textContent = `${staff.filter(s=>s.status==='Available').length} available now`;
+ 
+  document.getElementById('sup-kpi-open').textContent = tickets.open.length;
+  document.getElementById('sup-kpi-open-sub').textContent = `${tickets.open.filter(t=>t.priority==='Critical').length} critical priority`;
+ 
+  document.getElementById('sup-kpi-esc').textContent = tickets.progress.length;
+  document.getElementById('sup-kpi-esc-sub').textContent = `${tickets.progress.length} in active escalation`;
+ 
+  window._supTickets = tickets;
+  renderSupQueue();
+  renderSupStaff(staff);
+}
+ 
+function renderSupQueue(){
+  const {open, progress, resolved} = window._supTickets;
+  document.getElementById('sup-tab-open').textContent = `Open (${open.length})`;
+  document.getElementById('sup-tab-progress').textContent = `In Progress (${progress.length})`;
+  document.getElementById('sup-tab-resolved').textContent = `Resolved (${resolved.length})`;
+ 
+  const listEl = document.getElementById('sup-queue-list');
+  const items = supState.tab === 'open' ? open : supState.tab === 'progress' ? progress : resolved;
+  const rowCls = supState.tab === 'open' ? 'critical' : supState.tab === 'progress' ? 'high' : 'info';
+ 
+  if(!items.length){
+    listEl.innerHTML = '<div class="lp-empty">No tickets in this queue</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(t=>{
+    const rnd = seededRand(hashSeed(t.mod.code + t.category));
+    const hrs = 1 + Math.floor(rnd()*48);
+    const timeLabel = supState.tab === 'resolved' ? `Closed ${Math.floor(rnd()*6)+1}d ago` : `Opened ${hrs}h ago`;
+    const badgeClass = t.priority === 'Critical' ? 'critical' : t.priority === 'High' ? 'high' : t.priority === 'Medium' ? 'amber' : 'blue';
+    const dotColor = badgeClass === 'critical' ? 'var(--lp-critical)' : badgeClass === 'high' ? 'var(--lp-high)' : badgeClass === 'amber' ? 'var(--lp-amber)' : 'var(--lp-blue)';
+    return `<div class="lp-queue-row ${rowCls}">
+      <div class="lp-queue-top">
+        <span class="lp-queue-dot" style="background:${dotColor}"></span>
+        <span class="lp-queue-code">${t.category}</span>
+        <span class="lp-badge ${badgeClass}">${t.priority.toUpperCase()}</span>
+        <span class="lp-queue-time">${timeLabel}</span>
+      </div>
+      <div class="lp-queue-desc">${t.mod.code} · assigned to ${t.secData.incharge}</div>
+      <div class="lp-queue-bottom">
+        <span class="lp-queue-loc">${t.pinArea} · Ward ${t.ward} (${t.section})</span>
+        <button class="lp-btn-outline" data-pin="${t.pin}" data-ward="${t.ward}" data-section="${t.section}">View Zone</button>
+      </div>
+    </div>`;
+  }).join('');
+ 
+  listEl.querySelectorAll('.lp-btn-outline').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      switchPage('dashboard');
+      setSelection(btn.dataset.pin, btn.dataset.ward, btn.dataset.section);
+    });
+  });
+}
+ 
+function renderSupStaff(staff){
+  document.getElementById('sup-staff-count').textContent = `${staff.length} Coordinators`;
+  const badgeFor = s => s === 'Available' ? 'active' : s === 'On Field' ? 'amber' : 'blue';
+  document.getElementById('sup-staff-list').innerHTML = staff.map(s=>`
+    <div class="lp-module-card ok">
+      <div class="lp-module-top">
+        <span class="lp-module-code" style="font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;">${s.incharge}</span>
+        <span class="lp-badge ${badgeFor(s.status)}">${s.status}</span>
+      </div>
+      <div class="lp-module-meta">
+        <span class="lp-module-sub">${s.pinArea} · ${s.ward} (${s.section})</span>
+        <button class="lp-btn-outline ok" data-pin="${s.pin}" data-ward="${s.ward}" data-section="${s.section}">View</button>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--lp-faint);margin-top:6px;">&#9742; +91 ${s.contact}</div>
+    </div>`).join('');
+  document.getElementById('sup-staff-list').querySelectorAll('.lp-btn-outline').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      switchPage('dashboard');
+      setSelection(btn.dataset.pin, btn.dataset.ward, btn.dataset.section);
+    });
+  });
+}
+ 
+function supInitControls(){
+  document.querySelectorAll('[data-suptab]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      supState.tab = btn.dataset.suptab;
+      document.querySelectorAll('[data-suptab]').forEach(b=> b.classList.toggle('active', b===btn));
+      renderSupQueue();
+    });
+  });
+  document.getElementById('tk-submit-btn').addEventListener('click', supSubmitTicket);
+}
+ 
+function supSubmitTicket(){
+  const subject = document.getElementById('tk-subject').value.trim();
+  const category = document.getElementById('tk-category').value;
+  const priority = document.getElementById('tk-priority').value;
+  const desc = document.getElementById('tk-desc').value.trim();
+  const msgEl = document.getElementById('tk-msg');
+ 
+  if(!subject || !category || !priority || !desc){
+    msgEl.className = 'lp-form-msg err';
+    msgEl.textContent = '✕ Please fill all required fields (marked *) before submitting.';
+    return;
+  }
+  const ticketId = 'TK-' + (1000 + (hashSeed(subject + priority) % 8999));
+  msgEl.className = 'lp-form-msg ok';
+  msgEl.textContent = `✓ Ticket ${ticketId} submitted — ${priority} priority, routed to zone support desk.`;
+  document.getElementById('tk-subject').value = '';
+  document.getElementById('tk-category').value = '';
+  document.getElementById('tk-priority').value = '';
+  document.getElementById('tk-network').value = '';
+  document.getElementById('tk-desc').value = '';
+}
+ 
+/* ===================== CLOCK ===================== */
+function tickClock(){
+  const now = new Date();
+  const opts = { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, timeZone:'Asia/Kolkata' };
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB', opts) + ' IST';
+}
+ 
+/* ===================== RENDER / BOOT ===================== */
+function render(){
+  renderSidePanel();
+  renderMesh();
+  renderNetworkDetails();
+}
+ 
+function boot(){
+  populatePinSelect();
+  const firstPin = Object.keys(DATA)[0];
+  const firstWard = Object.keys(DATA[firstPin].wards)[0];
+  const firstSection = Object.keys(DATA[firstPin].wards[firstWard].sections)[0];
+  state.pin = firstPin; state.ward = firstWard; state.section = firstSection;
+  state.selectedModule = DATA[firstPin].wards[firstWard].sections[firstSection].modules[0].code;
+ 
+  selPin.value = firstPin;
+  populateWardSelect(firstPin);
+  selWard.value = firstWard;
+  populateSectionSelect(firstPin, firstWard);
+  selSection.value = firstSection;
+ 
+  initMap();
+  render();
+  renderNotifications();
+ 
+  wireToggle('tg-hex', 'hex', true);
+  wireToggle('tg-nodes', 'nodes', true);
+  wireToggle('tg-fault-vec', 'faultVectors', false);
+  wireToggle('tg-coords', 'coords', false);
+  wireStreamToggle();
+ 
+  lpInitControls();
+  supInitControls();
+ 
+  tickClock();
+  setInterval(tickClock, 1000);
+}
+ 
+boot();
+</script>
+</body>
+</html>
+ 
